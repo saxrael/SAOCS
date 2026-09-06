@@ -1,0 +1,143 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # 1. LINT STAGE
+  # ============================================================================
+  lint:
+    name: Lint Codebase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv & run Backend Lint (ruff)
+        run: |
+          if [ -d "backend" ] && [ -f "backend/pyproject.toml" ]; then
+            pip install uv
+            cd backend
+            uv run ruff check .
+          else
+            echo "Backend scaffold not yet present; skipping backend lint."
+          fi
+
+      - name: Set up Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Frontend Lint (eslint)
+        run: |
+          if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+            cd frontend
+            npm ci
+            npm run lint
+          else
+            echo "Frontend scaffold not yet present; skipping frontend lint."
+          fi
+
+  # ============================================================================
+  # 2. TEST STAGE
+  # ============================================================================
+  test:
+    name: Automated Tests
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Backend Tests (pytest)
+        run: |
+          if [ -d "backend" ] && [ -f "backend/pyproject.toml" ]; then
+            pip install uv
+            cd backend
+            uv run pytest -v
+          else
+            echo "Backend test suite not yet present; skipping backend tests."
+          fi
+
+      - name: Set up Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Frontend Tests (vitest)
+        run: |
+          if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+            cd frontend
+            npm ci
+            npm run test -- --run
+          else
+            echo "Frontend test suite not yet present; skipping frontend tests."
+          fi
+
+  # ============================================================================
+  # 3. BUILD STAGE
+  # ============================================================================
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Application Images
+        run: |
+          if [ -f "docker-compose.yml" ]; then
+            docker compose build
+          else
+            echo "docker-compose.yml not yet present; build skeleton verified."
+          fi
+
+  # ============================================================================
+  # 4. DEPLOY STAGE (Push to main only, gated by 'production' environment approval)
+  # ============================================================================
+  deploy:
+    name: Deploy to OCI Production VM
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH to OCI VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.OCI_VM_HOST }}
+          username: ${{ secrets.OCI_DEPLOY_USER }}
+          key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          script: |
+            echo "Deploying commit ${{ github.sha }} to production..."
+            cd /opt/saocs
+            git pull origin main
+            docker compose pull
+            docker compose up -d --remove-orphans
+            echo "Deployment complete."

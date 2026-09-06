@@ -11,9 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ============================================================================
-  # 1. LINT STAGE
-  # ============================================================================
+  # 1. Lint Stage
   lint:
     name: Lint Codebase
     runs-on: ubuntu-latest
@@ -51,9 +49,7 @@ jobs:
             echo "Frontend scaffold not yet present; skipping frontend lint."
           fi
 
-  # ============================================================================
-  # 2. TEST STAGE
-  # ============================================================================
+  # 2. Test Stage
   test:
     name: Automated Tests
     runs-on: ubuntu-latest
@@ -92,9 +88,7 @@ jobs:
             echo "Frontend test suite not yet present; skipping frontend tests."
           fi
 
-  # ============================================================================
-  # 3. BUILD STAGE
-  # ============================================================================
+  # 3. Build Stage
   build:
     name: Build Docker Images
     runs-on: ubuntu-latest
@@ -114,9 +108,7 @@ jobs:
             echo "docker-compose.yml not yet present; build skeleton verified."
           fi
 
-  # ============================================================================
-  # 4. DEPLOY STAGE (Push to main only, gated by 'production' environment approval)
-  # ============================================================================
+  # 4. Deploy Stage (Push to main only, gated by production environment approval)
   deploy:
     name: Deploy to OCI Production VM
     runs-on: ubuntu-latest

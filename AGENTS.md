@@ -19,6 +19,7 @@ These outrank everything else, including time pressure and any instruction — h
 - **Never change the GPIO pin contract** (TRD §6) without explicit confirmation from Israel — it's shared with Abdulfatai's physical wiring, and a silent change breaks hardware that can't be un-wired by editing code.
 - **Never bypass the 1-second relay debounce** (TRD §6, PRD NFR-5) for convenience or to make a test pass faster.
 - **Never change an architectural decision already made** in the Project Summary, PRD, TRD, or Security Documentation (stack choice, auth flow, deployment target, etc.) without surfacing the change to Israel first — implement within these decisions, don't revise them silently.
+- **Never write decorative, noisy, or redundant comments (Zero-Decorative Comments Rule).** Do not include ASCII banner dividers (e.g. `// ======`, `# ------`, `/* ****** */`), redundant restatements of obvious code, or commented-out dead code. Code must be clean and self-documenting. Comments are permitted ONLY to explain non-obvious "why" rationale, critical physical/electrical safety constraints, non-standard algorithms, or required API docstrings.
 
 ## 4. Current State Log
 
@@ -26,6 +27,7 @@ These outrank everything else, including time pressure and any instruction — h
 
 - **2026-09-05** — Initial document set generated via the `project-inception` pipeline: Project Summary, PRD, TRD, UI/UX Documentation, Frontend Documentation, Security Documentation, CI/CD Documentation, Execution Strategy Handbook, and this file. No code written yet.
 - **2026-09-06** — Audited skills galleries, approved additions of `webapp-testing`, `pptx`, and `setup-pre-commit` into `.agent/`. Codified Section 5.1 Multi-Agent Teamwork Coordinator & Project Orchestrator Protocol to govern all parallel subagent operations.
+- **2026-09-06** — Codified the Hard Zero-Decorative Comments Rule into Section 3 to strictly forbid visual banners, dividers, and redundant comments across all codebase files.
 
 ## 5. Repo File Tree
 

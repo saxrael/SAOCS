@@ -12,14 +12,20 @@ struct RelayChannel {
     uint32_t cooldownStartMs;
     bool hasPending;
     bool pendingState;
+    const char* pendingSource;
 };
 
 RelayChannel channels[RELAY_COUNT];
+StateChangeCallback stateChangeCb = nullptr;
+const char* activeSource = "boot";
 
-void apply(uint8_t channel, bool newState) {
+void apply(uint8_t channel, bool newState, const char* source) {
     channels[channel].currentState = newState;
     digitalWrite(RELAY_PINS[channel], newState ? HIGH : LOW);
     Storage::writeRelayState(channel, newState);
+    if (stateChangeCb != nullptr) {
+        stateChangeCb(channel, newState, source);
+    }
 }
 
 }
@@ -32,6 +38,7 @@ void begin() {
         channels[i].cooldownStartMs = 0;
         channels[i].hasPending = false;
         channels[i].pendingState = false;
+        channels[i].pendingSource = "boot";
     }
 }
 
@@ -42,6 +49,7 @@ void applyPersistedStates() {
         channels[i].cooldownStartMs = 0;
         channels[i].hasPending = false;
         channels[i].pendingState = false;
+        channels[i].pendingSource = "boot";
         digitalWrite(RELAY_PINS[i], persistedState ? HIGH : LOW);
     }
 }
@@ -59,10 +67,11 @@ void requestStateChange(uint8_t channel, bool newState) {
     if (channels[channel].cooldownStartMs != 0) {
         channels[channel].hasPending = true;
         channels[channel].pendingState = newState;
+        channels[channel].pendingSource = activeSource;
         return;
     }
 
-    apply(channel, newState);
+    apply(channel, newState, activeSource);
 
     uint32_t now = millis();
     if (now == 0) {
@@ -88,9 +97,10 @@ void tick() {
             channels[i].cooldownStartMs = 0;
             if (channels[i].hasPending) {
                 bool nextState = channels[i].pendingState;
+                const char* nextSource = channels[i].pendingSource;
                 channels[i].hasPending = false;
                 if (nextState != channels[i].currentState) {
-                    apply(i, nextState);
+                    apply(i, nextState, nextSource);
                     uint32_t applyNow = millis();
                     if (applyNow == 0) {
                         applyNow = 1;
@@ -134,6 +144,14 @@ uint32_t getCooldownRemainingMs(uint8_t channel) {
     }
 
     return RELAY_COOLDOWN_MS - elapsed;
+}
+
+void setStateChangeCallback(StateChangeCallback callback) {
+    stateChangeCb = callback;
+}
+
+void setCurrentSource(const char* source) {
+    activeSource = source;
 }
 
 }

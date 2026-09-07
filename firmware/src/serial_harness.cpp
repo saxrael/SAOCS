@@ -70,7 +70,7 @@ void processCommand(char* raw) {
     Serial.println("ERR UNKNOWN CMD");
 }
 
-} // namespace
+}
 
 void begin(uint32_t baudRate) {
     Serial.begin(baudRate);
@@ -101,6 +101,6 @@ void tick() {
     }
 }
 
-} // namespace SerialHarness
+}
 
-#endif // SERIAL_HARNESS_ENABLED
+#endif

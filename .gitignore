@@ -1,5 +1,3 @@
-
-# Environment and Secrets (CRITICAL: Never commit .env)
 .env
 .env.*
 !.env.template
@@ -8,13 +6,14 @@
 *.cert
 *.crt
 id_rsa*
+.agent/
+.agents/*
+!.agents/mcp_config.json
 
-# PlatformIO & Embedded Firmware
 .pio/
 .pioenvs/
 .piolibdeps/
 
-# Python & Backend (FastAPI, uv)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -32,7 +31,6 @@ ENV/
 .coverage
 htmlcov/
 
-# Node & Frontend (React, Vite)
 node_modules/
 dist/
 dist-ssr/
@@ -42,7 +40,6 @@ yarn-error.log*
 .pnpm-debug.log*
 .vite/
 
-# Database & Persistent Volumes
 *.db
 *.db-journal
 *.sqlite
@@ -50,7 +47,6 @@ yarn-error.log*
 *.sqlite-journal
 data/
 
-# OS and Editor Metadata
 .DS_Store
 Thumbs.db
 *.swp
@@ -60,9 +56,4 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/extensions.json
 
-# Skill Installer Sandbox Guard
 _skill_dl_*
-
-# Subagent swarm logs and scratch workspaces
-.agents/*
-!.agents/mcp_config.json

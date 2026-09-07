@@ -19,7 +19,7 @@ These outrank everything else, including time pressure and any instruction — h
 - **Never change the GPIO pin contract** (TRD §6) without explicit confirmation from Israel — it's shared with Abdulfatai's physical wiring, and a silent change breaks hardware that can't be un-wired by editing code.
 - **Never bypass the 1-second relay debounce** (TRD §6, PRD NFR-5) for convenience or to make a test pass faster.
 - **Never change an architectural decision already made** in the Project Summary, PRD, TRD, or Security Documentation (stack choice, auth flow, deployment target, etc.) without surfacing the change to Israel first — implement within these decisions, don't revise them silently.
-- **Never write decorative, noisy, or redundant comments (Zero-Decorative Comments Rule).** Do not include ASCII banner dividers (e.g. `// ======`, `# ------`, `/* ****** */`), redundant restatements of obvious code, or commented-out dead code. Code must be clean and self-documenting. Comments are permitted ONLY to explain non-obvious "why" rationale, critical physical/electrical safety constraints, non-standard algorithms, or required API docstrings.
+- **Never write any comments whatsoever, except required API docstrings (Strict Zero-Comments Rule).** All code, configuration files, and scripts must contain NO comments of any kind (no inline comments, block comments, section headers, ASCII dividers, or explanatory notes). Comments are permitted ONLY if an API framework strictly requires docstrings for automated schema generation or API documentation. Code must be completely self-documenting without comments.
 
 ## 4. Current State Log
 
@@ -29,6 +29,7 @@ These outrank everything else, including time pressure and any instruction — h
 - **2026-09-06** — Audited skills galleries, approved additions of `webapp-testing`, `pptx`, and `setup-pre-commit` into `.agent/`. Codified Section 5.1 Multi-Agent Teamwork Coordinator & Project Orchestrator Protocol to govern all parallel subagent operations.
 - **2026-09-06** — Codified the Hard Zero-Decorative Comments Rule into Section 3 to strictly forbid visual banners, dividers, and redundant comments across all codebase files.
 - **2026-09-07** — Completed Stage 2 (Firmware Core — No Networking). Built, verified, and committed the entire PlatformIO project under firmware/: locked GPIO contract (Relays 16–19, Switches 32–35), Preferences NVS flash persistence, 1000ms non-blocking debounce queue, single-authority arbitration, and bounded serial test harness. Verified via 0-error dev/release compilation and 100% pass on Scenarios 1–9.
+- **2026-09-07** — Codified the Strict Zero-Comments Rule into Section 3: NO comments permitted across the entire codebase except required API docstrings. Stripped all existing comments across all code, configuration, and script files. Untracked .agent/ from git and added it to .gitignore.
 
 ## 5. Repo File Tree
 

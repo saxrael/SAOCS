@@ -46,6 +46,8 @@ yarn-error.log*
 *.sqlite3
 *.sqlite-journal
 data/
+mosquitto/config/password_file
+mosquitto/data/
 
 .DS_Store
 Thumbs.db

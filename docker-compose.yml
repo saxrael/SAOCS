@@ -1,0 +1,40 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: saocs-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/config/password_file:/mosquitto/config/password_file:ro
+      - ./mosquitto/acl/acl.conf:/mosquitto/acl/acl.conf:ro
+      - mosquitto_data:/mosquitto/data
+    networks:
+      - saocs-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saocs-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      - mosquitto
+    networks:
+      - saocs-network
+
+volumes:
+  mosquitto_data:
+  backend_data:
+
+networks:
+  saocs-network:
+    driver: bridge

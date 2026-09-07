@@ -14,14 +14,13 @@ struct SwitchChannel {
 };
 
 SwitchChannel channels[SWITCH_COUNT];
-} // namespace
+}
 
 void begin() {
     for (uint8_t i = 0; i < SWITCH_COUNT; ++i) {
         if (i < 2) {
             pinMode(SWITCH_PINS[i], INPUT_PULLUP);
         } else {
-            // GPIO 34 and 35 are input-only on ESP32-WROOM-32 and lack internal pull-ups; external pull-up resistors required.
             pinMode(SWITCH_PINS[i], INPUT);
         }
 

@@ -22,7 +22,7 @@ void apply(uint8_t channel, bool newState) {
     Storage::writeRelayState(channel, newState);
 }
 
-} // namespace
+}
 
 void begin() {
     for (uint8_t i = 0; i < RELAY_COUNT; ++i) {
@@ -136,4 +136,4 @@ uint32_t getCooldownRemainingMs(uint8_t channel) {
     return RELAY_COOLDOWN_MS - elapsed;
 }
 
-} // namespace Relays
+}

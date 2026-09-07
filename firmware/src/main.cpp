@@ -16,7 +16,7 @@ void setup() {
     Storage::begin();
 
     Relays::begin();
-    Relays::applyPersistedStates(); // Drive pins from NVS before network or switches (TRD §6)
+    Relays::applyPersistedStates();
 
     Switches::begin();
 

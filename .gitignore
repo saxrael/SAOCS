@@ -62,3 +62,7 @@ Thumbs.db
 
 # Skill Installer Sandbox Guard
 _skill_dl_*
+
+# Subagent swarm logs and scratch workspaces
+.agents/*
+!.agents/mcp_config.json

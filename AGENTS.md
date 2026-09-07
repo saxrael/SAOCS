@@ -28,6 +28,7 @@ These outrank everything else, including time pressure and any instruction — h
 - **2026-09-05** — Initial document set generated via the `project-inception` pipeline: Project Summary, PRD, TRD, UI/UX Documentation, Frontend Documentation, Security Documentation, CI/CD Documentation, Execution Strategy Handbook, and this file. No code written yet.
 - **2026-09-06** — Audited skills galleries, approved additions of `webapp-testing`, `pptx`, and `setup-pre-commit` into `.agent/`. Codified Section 5.1 Multi-Agent Teamwork Coordinator & Project Orchestrator Protocol to govern all parallel subagent operations.
 - **2026-09-06** — Codified the Hard Zero-Decorative Comments Rule into Section 3 to strictly forbid visual banners, dividers, and redundant comments across all codebase files.
+- **2026-09-07** — Completed Stage 2 (Firmware Core — No Networking). Built, verified, and committed the entire PlatformIO project under firmware/: locked GPIO contract (Relays 16–19, Switches 32–35), Preferences NVS flash persistence, 1000ms non-blocking debounce queue, single-authority arbitration, and bounded serial test harness. Verified via 0-error dev/release compilation and 100% pass on Scenarios 1–9.
 
 ## 5. Repo File Tree
 

@@ -144,7 +144,8 @@ async def test_adversarial_lockout_boundary_and_oauth_recovery(
         AsyncMock(return_value={"userinfo": {"email": user.email, "sub": "google-sub-adv-unlock"}}),
     ):
         oauth_res = await client.get("/api/auth/google/callback")
-        assert oauth_res.status_code == 200
+        assert oauth_res.status_code == 307
+        assert oauth_res.headers["location"].startswith(f"{settings.frontend_url}/auth/callback?")
 
     await db_session.refresh(user)
     assert user.failed_login_attempts == 0
@@ -357,3 +358,30 @@ async def test_adversarial_registration_role_enforcement(
     )
     assert res_admin.status_code == 201
     assert res_admin.json()["email"] == "authorized_new@example.com"
+
+
+@pytest.mark.asyncio
+async def test_adversarial_non_admin_rbac_restrictions(
+    client: AsyncClient,
+    admin_user: tuple[User, str],
+    regular_user: tuple[User, str],
+):
+    _, regular_token = regular_user
+    headers_regular = {"Authorization": f"Bearer {regular_token}"}
+
+    res_export = await client.get("/api/activity-log/export", headers=headers_regular)
+    assert res_export.status_code == 403
+    assert "Admin privileges required" in res_export.json()["detail"]
+
+    res_users = await client.get("/api/users/", headers=headers_regular)
+    assert res_users.status_code == 403
+    assert "Admin privileges required" in res_users.json()["detail"]
+
+    _, admin_token = admin_user
+    headers_admin = {"Authorization": f"Bearer {admin_token}"}
+
+    res_admin_export = await client.get("/api/activity-log/export", headers=headers_admin)
+    assert res_admin_export.status_code == 200
+
+    res_admin_users = await client.get("/api/users/", headers=headers_admin)
+    assert res_admin_users.status_code == 200

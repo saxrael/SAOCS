@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./assets/fonts/plus-jakarta-sans-variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./assets/fonts/outfit-variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./assets/fonts/jetbrains-mono-variable.woff2") format("woff2");
+}
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-display: "Outfit", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: #0F172A;
+  --color-surface: #1E293B;
+  --color-surface-2: #334155;
+  --color-foreground: #F8FAFC;
+  --color-foreground-2: #94A3B8;
+  --color-accent: #2DD4BF;
+  --color-accent-hover: #14B8A6;
+  --color-destructive: #EF4444;
+  --color-destructive-hover: #DC2626;
+  --color-warning: #F59E0B;
+  --color-border: #334155;
+  --color-ring: #2DD4BF;
+  --color-input-bg: #1E293B;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: light) {
+  @theme {
+    --color-background: #F8FAFC;
+    --color-surface: #FFFFFF;
+    --color-surface-2: #F1F5F9;
+    --color-foreground: #0F172A;
+    --color-foreground-2: #64748B;
+    --color-accent: #0D9488;
+    --color-accent-hover: #0F766E;
+    --color-border: #E2E8F0;
+    --color-ring: #0D9488;
+    --color-input-bg: #FFFFFF;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-modal: 0 4px 24px rgba(0, 0, 0, 0.15);
+  }
+}
+
+html {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

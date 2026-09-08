@@ -13,7 +13,6 @@ id_rsa*
 .pio/
 .pioenvs/
 .piolibdeps/
-
 __pycache__/
 *.py[cod]
 *$py.class
@@ -39,6 +38,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .vite/
+*.tsbuildinfo
 
 *.db
 *.db-journal

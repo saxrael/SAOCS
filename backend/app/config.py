@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     google_client_id: str = "google-client-id-placeholder"
     google_client_secret: str = "google-client-secret-placeholder"
     google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
+    frontend_url: str = "http://localhost:5173"
 
     mqtt_broker_host: str = "localhost"
     mqtt_port: int = 1883

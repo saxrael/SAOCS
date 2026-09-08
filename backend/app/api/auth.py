@@ -1,4 +1,7 @@
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +13,6 @@ from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     SetupPasswordRequest,
-    SetupTokenResponse,
     TokenResponse,
 )
 from app.schemas.user import UserResponse
@@ -34,7 +36,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def google_login(request: Request):
     return await oauth.google.authorize_redirect(request, settings.google_redirect_uri)
 
-@router.get("/google/callback", response_model=TokenResponse | SetupTokenResponse)
+@router.get("/google/callback")
 async def google_callback(
     request: Request,
     session: AsyncSession = Depends(get_db),
@@ -70,11 +72,20 @@ async def google_callback(
 
     if user.hashed_password is None:
         setup_token = create_setup_token(user.id, user.email)
-        return SetupTokenResponse(setup_token=setup_token, needs_password_setup=True)
+        redirect_params = urlencode({"setup_token": setup_token})
+        return RedirectResponse(
+            url=f"{settings.frontend_url}/setup-password?{redirect_params}"
+        )
 
     access_token = create_access_token(user.id, user.email, user.is_admin)
     refresh_token = create_refresh_token(user.id)
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    redirect_params = urlencode({
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    })
+    return RedirectResponse(
+        url=f"{settings.frontend_url}/auth/callback?{redirect_params}"
+    )
 
 @router.post("/setup-password", response_model=TokenResponse)
 async def setup_password(

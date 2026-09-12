@@ -16,6 +16,7 @@ from app.services.mqtt_service import mqtt_service
 def reset_mqtt_state():
     mqtt_service.last_command_time.clear()
     mqtt_service.pending_actors.clear()
+    mqtt_service.device_status.clear()
     mqtt_service.client = AsyncMock()
     with (
         patch.object(mqtt_service, "start", AsyncMock()),
@@ -24,6 +25,7 @@ def reset_mqtt_state():
         yield
     mqtt_service.last_command_time.clear()
     mqtt_service.pending_actors.clear()
+    mqtt_service.device_status.clear()
     mqtt_service.client = None
 
 @pytest.fixture

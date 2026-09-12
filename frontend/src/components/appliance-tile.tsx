@@ -32,7 +32,10 @@ export function ApplianceTile({ appliance }: { appliance: Appliance }) {
   }
 
   return (
-    <div className="bg-(--color-surface) border border-(--color-border) rounded-(--radius-lg) p-6 shadow-(--shadow-card) flex flex-col justify-between transition-colors">
+    <div
+      data-testid="appliance-tile"
+      className="bg-(--color-surface) border border-(--color-border) rounded-(--radius-lg) p-6 shadow-(--shadow-card) flex flex-col justify-between transition-colors"
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-base font-semibold font-(--font-display) text-(--color-foreground)">
@@ -54,6 +57,7 @@ export function ApplianceTile({ appliance }: { appliance: Appliance }) {
             <Power className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
           )}
           <span
+            data-testid="state-text"
             className={`text-xs font-bold font-(--font-mono) uppercase ${
               isOn ? "text-(--color-accent)" : "text-slate-400"
             }`}

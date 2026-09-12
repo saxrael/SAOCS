@@ -8,6 +8,7 @@ export function ConnectionStatusBanner({ status }: { status: ConnectionStatus })
   return (
     <div
       role="status"
+      data-testid="connection-status"
       className={`w-full py-2 px-4 text-xs font-medium text-center flex items-center justify-center gap-2 transition-colors ${
         isConnecting
           ? "bg-amber-950/90 border-b border-(--color-warning) text-amber-200"

@@ -22,6 +22,7 @@ class MqttService:
         self._running: bool = False
         self.last_command_time: dict[tuple[str, int], float] = {}
         self.pending_actors: dict[tuple[str, int], int | None] = {}
+        self.device_status: dict[str, str] = {}
 
     async def start(self) -> None:
         self._running = True
@@ -63,6 +64,8 @@ class MqttService:
                 break
             except Exception:
                 await asyncio.sleep(2)
+            finally:
+                self.client = None
 
     async def process_message(self, topic: str, payload_str: str) -> None:
         parts = topic.split("/")
@@ -145,11 +148,13 @@ class MqttService:
         })
 
     async def handle_status_message(self, device_id: str, status_str: str) -> None:
+        normalized_status = status_str.strip().lower()
+        self.device_status[device_id] = normalized_status
         now = datetime.now(UTC)
         await websocket_manager.broadcast({
             "event": "device_status",
             "device_id": device_id,
-            "status": status_str,
+            "status": normalized_status,
             "timestamp": now.isoformat(),
         })
 
@@ -160,6 +165,18 @@ class MqttService:
         state: str,
         actor_user_id: int | None = None,
     ) -> None:
+        if self.client is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="MQTT broker disconnected",
+            )
+
+        if self.device_status.get(device_id) == "offline":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Device {device_id} is offline",
+            )
+
         key = (device_id, channel)
         now = time.monotonic()
         last_time = self.last_command_time.get(key, 0.0)
@@ -177,7 +194,14 @@ class MqttService:
         topic = f"office/{device_id}/command"
         payload = json.dumps({"channel": channel, "state": state})
 
-        if self.client:
+        try:
             await self.client.publish(topic, payload=payload, qos=1)
+        except aiomqtt.MqttError as exc:
+            self.last_command_time.pop(key, None)
+            self.pending_actors.pop(key, None)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"MQTT publish failed: {exc}",
+            )
 
 mqtt_service = MqttService()

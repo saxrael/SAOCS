@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     app_version: str = "0.1.0"
-    git_sha: str = "02011e3"
+    git_sha: str = "local"
     server_host: str = "0.0.0.0"
     server_port: int = 8000
     allowed_origins: str = "http://localhost:5173,https://localhost:8000"

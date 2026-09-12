@@ -102,3 +102,21 @@ async def test_t_c4_lwt_status_message_triggers_websocket_broadcast(
         assert broadcast_data["event"] == "device_status"
         assert broadcast_data["device_id"] == sample_appliance.device_id
         assert broadcast_data["status"] == "offline"
+        assert mqtt_service.device_status[sample_appliance.device_id] == "offline"
+
+
+@pytest.mark.asyncio
+async def test_t_c5_status_message_updates_device_status_dict(
+    sample_appliance: Appliance,
+):
+    await mqtt_service.handle_status_message(
+        device_id=sample_appliance.device_id,
+        status_str="online",
+    )
+    assert mqtt_service.device_status[sample_appliance.device_id] == "online"
+
+    await mqtt_service.handle_status_message(
+        device_id=sample_appliance.device_id,
+        status_str="offline",
+    )
+    assert mqtt_service.device_status[sample_appliance.device_id] == "offline"

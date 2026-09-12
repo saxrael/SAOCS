@@ -1,0 +1,15 @@
+{$DUCKDNS_DOMAIN} {
+	tls {
+		dns duckdns {$DUCKDNS_TOKEN}
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -7,8 +7,10 @@
 *.crt
 id_rsa*
 .agent/
-.agents/*
-!.agents/mcp_config.json
+.agents/
+AGENTS.md
+SKILLS_MANIFEST.md
+STAGE_PROTOCOLS.md
 
 .pio/
 .pioenvs/
@@ -59,3 +61,10 @@ Thumbs.db
 !.vscode/extensions.json
 
 _skill_dl_*
+
+caddy_data/
+caddy_config/
+
+playwright-report/
+playwright-results.json
+test-results/

@@ -1,16 +1,24 @@
 services:
-  mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: saocs-mosquitto
+  caddy:
+    build:
+      context: .
+      dockerfile: caddy/Dockerfile
+    container_name: saocs-caddy
     restart: unless-stopped
     ports:
-      - "1883:1883"
-      - "8883:8883"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
-      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ./mosquitto/config/password_file:/mosquitto/config/password_file:ro
-      - ./mosquitto/acl/acl.conf:/mosquitto/acl/acl.conf:ro
-      - mosquitto_data:/mosquitto/data
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      backend:
+        condition: service_healthy
     networks:
       - saocs-network
 
@@ -18,22 +26,65 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
     container_name: saocs-backend
     restart: unless-stopped
     env_file:
-      - .env
-    ports:
-      - "8000:8000"
+      - path: .env
+        required: false
     volumes:
       - backend_data:/app/data
     depends_on:
-      - mosquitto
+      mosquitto:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks:
+      - saocs-network
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: saocs-mosquitto
+    restart: unless-stopped
+    ports:
+      - "8883:8883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/config/password_file:/mosquitto/config/password_file:ro
+      - ./mosquitto/acl/acl.conf:/mosquitto/acl/acl.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - caddy_data:/caddy-data:ro
+    networks:
+      - saocs-network
+
+  duckdns:
+    image: alpine:3.20
+    container_name: saocs-duckdns
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        while true; do
+          wget -qO- "https://www.duckdns.org/update?domains=${DUCKDNS_SUBDOMAIN}&token=${DUCKDNS_TOKEN}&ip=" && echo " $(date)"
+          sleep 300
+        done
     networks:
       - saocs-network
 
 volumes:
-  mosquitto_data:
+  caddy_data:
+  caddy_config:
   backend_data:
+  mosquitto_data:
 
 networks:
   saocs-network:

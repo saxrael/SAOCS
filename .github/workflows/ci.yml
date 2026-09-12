@@ -12,120 +12,119 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint Codebase
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install uv & run Backend Lint (ruff)
+      - name: Backend Lint
         run: |
-          if [ -d "backend" ] && [ -f "backend/pyproject.toml" ]; then
-            pip install uv
-            cd backend
-            uv run ruff check .
-          else
-            echo "Backend scaffold not yet present; skipping backend lint."
-          fi
+          pip install uv
+          cd backend
+          uv sync --frozen --no-install-project
+          uv run ruff check .
 
-      - name: Set up Node.js LTS
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Run Frontend Lint (eslint)
+      - name: Frontend Lint
         run: |
-          if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-            cd frontend
-            npm ci
-            npm run lint
-          else
-            echo "Frontend scaffold not yet present; skipping frontend lint."
-          fi
+          cd frontend
+          npm ci
+          npm run lint
 
   test:
-    name: Automated Tests
+    name: Test
     runs-on: ubuntu-latest
     needs: [lint]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Run Backend Tests (pytest)
+      - name: Backend Tests
         run: |
-          if [ -d "backend" ] && [ -f "backend/pyproject.toml" ]; then
-            pip install uv
-            cd backend
-            uv run pytest -v
-          else
-            echo "Backend test suite not yet present; skipping backend tests."
-          fi
+          pip install uv
+          cd backend
+          uv sync --frozen
+          uv run pytest -v
 
-      - name: Set up Node.js LTS
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Run Frontend Tests (vitest)
+      - name: Frontend Tests
         run: |
-          if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-            cd frontend
-            npm ci
-            npm run test -- --run
-          else
-            echo "Frontend test suite not yet present; skipping frontend tests."
-          fi
+          cd frontend
+          npm ci
+          npm run test
 
   build:
-    name: Build Docker Images
+    name: Build
     runs-on: ubuntu-latest
     needs: [test]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Build Application Images
-        run: |
-          if [ -f "docker-compose.yml" ]; then
-            docker compose build
-          else
-            echo "docker-compose.yml not yet present; build skeleton verified."
-          fi
+      - name: Build Docker Images
+        run: GIT_SHA=${{ github.sha }} docker compose build
 
   deploy:
-    name: Deploy to OCI Production VM
+    name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: production
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Deploy via SSH to OCI VM
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.OCI_VM_HOST }}
           username: ${{ secrets.OCI_DEPLOY_USER }}
           key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
           script: |
-            echo "Deploying commit ${{ github.sha }} to production..."
             cd /opt/saocs
-            git pull origin main
-            docker compose pull
-            docker compose up -d --remove-orphans
-            echo "Deployment complete."
+            git fetch origin main
+            git reset --hard origin/main
+            if [ -f .env ]; then
+              DOMAIN=$(grep -E '^DUCKDNS_DOMAIN=' .env | cut -d= -f2- | tr -d ' "\r\n')
+              if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "your-subdomain.duckdns.org" ]; then
+                sed -i "s/DUCKDNS_DOMAIN/$DOMAIN/g" mosquitto/config/mosquitto.conf
+              fi
+            fi
+            GIT_SHA=${{ github.sha }} docker compose build --no-cache
+            GIT_SHA=${{ github.sha }} docker compose up -d --remove-orphans
+            sleep 10
+            docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
+            echo "Deploy verified: ${{ github.sha }}"
+
+      - name: Verify Deployment
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.OCI_VM_HOST }}
+          username: ${{ secrets.OCI_DEPLOY_USER }}
+          key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/saocs
+            DEPLOYED_SHA=$(docker compose exec -T backend python -c "import urllib.request,json; print(json.load(urllib.request.urlopen('http://localhost:8000/api/version'))['git_sha'])")
+            if [ "$DEPLOYED_SHA" != "${{ github.sha }}" ]; then
+              echo "DEPLOY VERIFICATION FAILED: expected ${{ github.sha }}, got $DEPLOYED_SHA"
+              exit 1
+            fi
+            echo "Deploy SHA verified: $DEPLOYED_SHA"

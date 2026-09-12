@@ -11,6 +11,7 @@ id_rsa*
 AGENTS.md
 SKILLS_MANIFEST.md
 STAGE_PROTOCOLS.md
+docs/
 
 .pio/
 .pioenvs/

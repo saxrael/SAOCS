@@ -94,19 +94,71 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          DUCKDNS_DOMAIN: ${{ secrets.DUCKDNS_DOMAIN }}
+          DUCKDNS_SUBDOMAIN: ${{ secrets.DUCKDNS_SUBDOMAIN }}
+          DUCKDNS_TOKEN: ${{ secrets.DUCKDNS_TOKEN }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          MQTT_BACKEND_PASSWORD: ${{ secrets.MQTT_BACKEND_PASSWORD }}
+          MQTT_DEVICE_PASSWORD: ${{ secrets.MQTT_DEVICE_PASSWORD }}
+          OTA_PASSWORD: ${{ secrets.OTA_PASSWORD }}
+          WIFI_SSID: ${{ secrets.WIFI_SSID }}
+          WIFI_PASSWORD: ${{ secrets.WIFI_PASSWORD }}
+          OCI_STATIC_IP: ${{ secrets.OCI_STATIC_IP }}
+          GIT_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.OCI_VM_HOST }}
           username: ${{ secrets.OCI_DEPLOY_USER }}
           key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          envs: DUCKDNS_DOMAIN,DUCKDNS_SUBDOMAIN,DUCKDNS_TOKEN,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,FRONTEND_URL,VITE_API_BASE_URL,ALLOWED_ORIGINS,MQTT_BACKEND_PASSWORD,MQTT_DEVICE_PASSWORD,OTA_PASSWORD,WIFI_SSID,WIFI_PASSWORD,OCI_STATIC_IP,GIT_SHA
           script: |
             cd /opt/saocs
             git fetch origin main
             git reset --hard origin/main
-            if [ -f .env ]; then
-              DOMAIN=$(grep -E '^DUCKDNS_DOMAIN=' .env | cut -d= -f2- | tr -d ' "\r\n')
-              if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "your-subdomain.duckdns.org" ]; then
-                sed -i "s/DUCKDNS_DOMAIN/$DOMAIN/g" mosquitto/config/mosquitto.conf
-              fi
+            cat > .env << EOF
+            ENVIRONMENT=production
+            APP_VERSION=0.1.0
+            SERVER_HOST=0.0.0.0
+            SERVER_PORT=8000
+            ALLOWED_ORIGINS=$ALLOWED_ORIGINS
+            DATABASE_URL=sqlite:///./data/saocs.db
+            JWT_SECRET_KEY=$JWT_SECRET_KEY
+            ALGORITHM=HS256
+            ACCESS_TOKEN_EXPIRE_MINUTES=60
+            REFRESH_TOKEN_EXPIRE_DAYS=7
+            GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+            GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+            GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+            FRONTEND_URL=$FRONTEND_URL
+            VITE_API_BASE_URL=$VITE_API_BASE_URL
+            WIFI_SSID=$WIFI_SSID
+            WIFI_PASSWORD=$WIFI_PASSWORD
+            MQTT_BROKER_HOST=mosquitto
+            MQTT_BROKER_PORT=1883
+            MQTT_PORT=1883
+            MQTT_TLS_PORT=8883
+            MQTT_BACKEND_USER=saocs_backend
+            MQTT_BACKEND_PASSWORD=$MQTT_BACKEND_PASSWORD
+            MQTT_DEVICE_USER=saocs_esp32
+            MQTT_DEVICE_PASSWORD=$MQTT_DEVICE_PASSWORD
+            MQTT_DEFAULT_DEVICE_ID=esp32_prototype_01
+            TARIFF_RATE_PER_KWH=209.5
+            OTA_PASSWORD=$OTA_PASSWORD
+            DUCKDNS_DOMAIN=$DUCKDNS_DOMAIN
+            DUCKDNS_SUBDOMAIN=$DUCKDNS_SUBDOMAIN
+            DUCKDNS_TOKEN=$DUCKDNS_TOKEN
+            OCI_STATIC_IP=$OCI_STATIC_IP
+            GIT_SHA=$GIT_SHA
+            EOF
+            chmod 600 .env
+            if [ -n "$DUCKDNS_DOMAIN" ] && [ "$DUCKDNS_DOMAIN" != "your-subdomain.duckdns.org" ]; then
+              sed -i "s/DUCKDNS_DOMAIN/$DUCKDNS_DOMAIN/g" mosquitto/config/mosquitto.conf
             fi
             GIT_SHA=${{ github.sha }} docker compose build --no-cache
             GIT_SHA=${{ github.sha }} docker compose up -d --remove-orphans

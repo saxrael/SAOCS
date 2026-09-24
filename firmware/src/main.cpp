@@ -45,9 +45,10 @@ void setup() {
 }
 
 void loop() {
-    Switches::tick([](uint8_t channel, bool newState) {
+    Switches::tick([](uint8_t channel, bool) {
         Relays::setCurrentSource("switch");
-        Relays::requestStateChange(channel, newState);
+        bool targetState = !Relays::getState(channel);
+        Relays::requestStateChange(channel, targetState);
     });
 
     Relays::tick();

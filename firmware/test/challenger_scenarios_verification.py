@@ -336,12 +336,12 @@ def run_empirical_scenarios ():
     switches .pins [0 ]=0 
     for _ in range (20 ):
         clock .advance (1 )
-        switches .tick (lambda ch ,st :relays .requestStateChange (ch ,st ))
+        switches .tick (lambda ch ,_ :relays .requestStateChange (ch ,not relays .getState (ch )))
         relays .tick ()
     assert relays .getState (0 )==True 
     for _ in range (40 ):
         clock .advance (1 )
-        switches .tick (lambda ch ,st :relays .requestStateChange (ch ,st ))
+        switches .tick (lambda ch ,_ :relays .requestStateChange (ch ,not relays .getState (ch )))
         relays .tick ()
     assert relays .getState (0 )==False 
     harness .handleCommand ("STATUS")
@@ -350,7 +350,7 @@ def run_empirical_scenarios ():
     switches .pins [0 ]=1 
     for _ in range (60 ):
         clock .advance (1 )
-        switches .tick (lambda ch ,st :relays .requestStateChange (ch ,st ))
+        switches .tick (lambda ch ,_ :relays .requestStateChange (ch ,not relays .getState (ch )))
         relays .tick ()
     assert relays .getState (0 )==True 
     harness .handleCommand ("STATUS")
@@ -360,7 +360,7 @@ def run_empirical_scenarios ():
     switches .pins [0 ]=0 
     for _ in range (60 ):
         clock .advance (1 )
-        switches .tick (lambda ch ,st :relays .requestStateChange (ch ,st ))
+        switches .tick (lambda ch ,_ :relays .requestStateChange (ch ,not relays .getState (ch )))
         relays .tick ()
     assert relays .getState (0 )==False 
     step (100 )

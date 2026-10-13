@@ -9,6 +9,7 @@ static constexpr uint32_t RELAY_COOLDOWN_MS = 1000;
 static constexpr uint32_t SWITCH_DEBOUNCE_MS = 50;
 static constexpr char NVS_NAMESPACE[] = "saocs";
 static constexpr char NVS_RELAY_KEYS[2][3] = {"r1", "r2"};
+static constexpr bool RELAY_ACTIVE_LOW = true;
 
 #ifdef MQTT_ENABLED
 static constexpr char MQTT_TOPIC_PREFIX[] = "office";

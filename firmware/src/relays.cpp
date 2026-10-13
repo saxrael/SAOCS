@@ -19,9 +19,13 @@ RelayChannel channels[RELAY_COUNT];
 StateChangeCallback stateChangeCb = nullptr;
 const char* activeSource = "boot";
 
+inline uint8_t relayPinLevel(bool state) {
+    return RELAY_ACTIVE_LOW ? (state ? LOW : HIGH) : (state ? HIGH : LOW);
+}
+
 void apply(uint8_t channel, bool newState, const char* source) {
     channels[channel].currentState = newState;
-    digitalWrite(RELAY_PINS[channel], newState ? HIGH : LOW);
+    digitalWrite(RELAY_PINS[channel], relayPinLevel(newState));
     Storage::writeRelayState(channel, newState);
     if (stateChangeCb != nullptr) {
         stateChangeCb(channel, newState, source);
@@ -33,7 +37,7 @@ void apply(uint8_t channel, bool newState, const char* source) {
 void begin() {
     for (uint8_t i = 0; i < RELAY_COUNT; ++i) {
         pinMode(RELAY_PINS[i], OUTPUT);
-        digitalWrite(RELAY_PINS[i], LOW);
+        digitalWrite(RELAY_PINS[i], relayPinLevel(false));
         channels[i].currentState = false;
         channels[i].cooldownStartMs = 0;
         channels[i].hasPending = false;
@@ -50,7 +54,7 @@ void applyPersistedStates() {
         channels[i].hasPending = false;
         channels[i].pendingState = false;
         channels[i].pendingSource = "boot";
-        digitalWrite(RELAY_PINS[i], persistedState ? HIGH : LOW);
+        digitalWrite(RELAY_PINS[i], relayPinLevel(persistedState));
     }
 }
 

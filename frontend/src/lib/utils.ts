@@ -2,6 +2,13 @@ import type { Appliance } from "@/types/appliance"
 import type { ActivityLogEntry } from "@/types/activity-log"
 import { TARIFF_RATE_PER_KWH } from "./constants"
 
+export function parseUtcDate(isoString: string): Date {
+  if (!isoString.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(isoString)) {
+    return new Date(isoString + "Z")
+  }
+  return new Date(isoString)
+}
+
 export function computeDailyEnergy(
   appliances: Appliance[],
   logs: ActivityLogEntry[],
@@ -13,10 +20,10 @@ export function computeDailyEnergy(
   for (const appliance of appliances) {
     const allAppLogs = logs
       .filter((l) => l.appliance_id === appliance.id)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .sort((a, b) => parseUtcDate(a.timestamp).getTime() - parseUtcDate(b.timestamp).getTime())
 
-    const priorLogs = allAppLogs.filter((l) => new Date(l.timestamp).getTime() < startOfDay)
-    const todayLogs = allAppLogs.filter((l) => new Date(l.timestamp).getTime() >= startOfDay)
+    const priorLogs = allAppLogs.filter((l) => parseUtcDate(l.timestamp).getTime() < startOfDay)
+    const todayLogs = allAppLogs.filter((l) => parseUtcDate(l.timestamp).getTime() >= startOfDay)
 
     let onTime: number | null = null
     let totalDurationMs = 0
@@ -28,7 +35,7 @@ export function computeDailyEnergy(
       }
     } else if (appliance.state?.current_state === "ON" && todayLogs.length === 0) {
       if (appliance.state.last_changed_at) {
-        const changedTime = new Date(appliance.state.last_changed_at).getTime()
+        const changedTime = parseUtcDate(appliance.state.last_changed_at).getTime()
         onTime = Math.max(startOfDay, changedTime)
       } else {
         onTime = startOfDay
@@ -36,19 +43,19 @@ export function computeDailyEnergy(
     }
 
     for (const log of todayLogs) {
-      const logTime = new Date(log.timestamp).getTime()
+      const logTime = parseUtcDate(log.timestamp).getTime()
       if (log.event_type === "POWER_ON" || log.event_type === "ON") {
         if (onTime === null) {
           onTime = logTime
         }
       } else if ((log.event_type === "POWER_OFF" || log.event_type === "OFF") && onTime !== null) {
-        totalDurationMs += logTime - onTime
+        totalDurationMs += Math.max(0, logTime - onTime)
         onTime = null
       }
     }
 
     if (onTime !== null) {
-      totalDurationMs += now.getTime() - onTime
+      totalDurationMs += Math.max(0, now.getTime() - onTime)
     }
 
     const hours = totalDurationMs / (1000 * 60 * 60)
@@ -60,11 +67,11 @@ export function computeDailyEnergy(
 }
 
 export function formatDateTime(isoString: string): string {
-  return new Date(isoString).toLocaleString()
+  return parseUtcDate(isoString).toLocaleString()
 }
 
 export function formatDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString()
+  return parseUtcDate(isoString).toLocaleDateString()
 }
 
 export function formatKwh(kwh: number): string {

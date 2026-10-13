@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { computeDailyEnergy, formatDate, formatDateTime, formatKwh } from "@/lib/utils"
+import { computeDailyEnergy, formatDate, formatDateTime, formatKwh, parseUtcDate } from "@/lib/utils"
 import { TARIFF_RATE_PER_KWH } from "@/lib/constants"
 import type { Appliance } from "@/types/appliance"
 import type { ActivityLogEntry } from "@/types/activity-log"
@@ -72,5 +72,11 @@ describe("utils", () => {
     expect(formatKwh(0.01)).toBe("0.01")
     expect(formatKwh(0.75)).toBe("0.75")
     expect(formatKwh(1.2)).toBe("1.20")
+  })
+
+  it("parses UTC dates correctly even when Z suffix is omitted", () => {
+    const withoutZ = "2026-10-13T12:00:00"
+    const withZ = "2026-10-13T12:00:00Z"
+    expect(parseUtcDate(withoutZ).getTime()).toBe(parseUtcDate(withZ).getTime())
   })
 })

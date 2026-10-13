@@ -18,6 +18,7 @@ export function ApplianceTile({ appliance }: { appliance: Appliance }) {
     onSuccess: () => {
       setError(null)
       queryClient.invalidateQueries({ queryKey: ["appliances"] })
+      queryClient.invalidateQueries({ queryKey: ["activity-log"] })
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Command failed"

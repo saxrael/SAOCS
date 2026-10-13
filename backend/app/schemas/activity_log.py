@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class ActivityLogResponse(BaseModel):
@@ -12,5 +12,12 @@ class ActivityLogResponse(BaseModel):
     actor_user_id: int | None = None
     actor_email: str | None = None
     timestamp: datetime
+
+    @field_validator("timestamp", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            return v.replace(tzinfo=UTC)
+        return v.astimezone(UTC)
 
     model_config = ConfigDict(from_attributes=True)

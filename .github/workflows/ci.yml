@@ -157,11 +157,36 @@ jobs:
             GIT_SHA=$GIT_SHA
             EOF
             chmod 600 .env
-            if [ -n "$DUCKDNS_DOMAIN" ] && [ "$DUCKDNS_DOMAIN" != "your-subdomain.duckdns.org" ]; then
-              sed -i "s/DUCKDNS_DOMAIN/$DUCKDNS_DOMAIN/g" mosquitto/config/mosquitto.conf
-            fi
+            rm -rf mosquitto/config/password_file
+            touch mosquitto/config/password_file
+            docker run --rm -v "$(pwd)/mosquitto/config:/mosquitto/config" eclipse-mosquitto:2 mosquitto_passwd -b /mosquitto/config/password_file saocs_backend "$MQTT_BACKEND_PASSWORD"
+            docker run --rm -v "$(pwd)/mosquitto/config:/mosquitto/config" eclipse-mosquitto:2 mosquitto_passwd -b /mosquitto/config/password_file saocs_esp32 "$MQTT_DEVICE_PASSWORD"
+            chmod 644 mosquitto/config/password_file
+            cat > mosquitto/config/mosquitto.conf << 'EOF_MOSQ'
+            listener 1883 0.0.0.0
+            allow_anonymous false
+            password_file /mosquitto/config/password_file
+            acl_file /mosquitto/acl/acl.conf
+            persistence true
+            persistence_location /mosquitto/data/
+            log_dest stdout
+            EOF_MOSQ
             GIT_SHA=${{ github.sha }} docker compose build --no-cache
             GIT_SHA=${{ github.sha }} docker compose up -d --remove-orphans
+            if [ -n "$DUCKDNS_DOMAIN" ] && [ "$DUCKDNS_DOMAIN" != "your-subdomain.duckdns.org" ]; then
+              for i in $(seq 1 30); do
+                if docker exec saocs-caddy test -f "/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/$DUCKDNS_DOMAIN/$DUCKDNS_DOMAIN.crt"; then
+                  break
+                fi
+                sleep 3
+              done
+              if docker exec saocs-caddy test -f "/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/$DUCKDNS_DOMAIN/$DUCKDNS_DOMAIN.crt"; then
+                docker exec saocs-caddy chmod -R a+rX /data/caddy/certificates
+                git checkout -- mosquitto/config/mosquitto.conf
+                sed -i "s/DUCKDNS_DOMAIN/$DUCKDNS_DOMAIN/g" mosquitto/config/mosquitto.conf
+                docker compose up -d --force-recreate mosquitto
+              fi
+            fi
             sleep 10
             docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
             echo "Deploy verified: ${{ github.sha }}"

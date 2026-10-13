@@ -60,13 +60,13 @@ graph TB
 
     subgraph EdgeDevice["Hardware Prototype Box (Physical Laboratory)"]
         ESP32["ESP32 Microcontroller<br/>(Arduino Framework + NVS Flash)"]
-        RelayBoard["4-Channel 5V Relay Module<br/>(PC817 Optocouplers + 1N4007 Diodes)"]
-        WallSwitches["4x Physical SPST Switches<br/>(Logical 2-Way Edge Sensing)"]
-        MainsAC["220V AC Mains Distribution<br/>(Fused Bus, E27 Sockets & 3-Pin Outlet)"]
-        Appliances["Physical Loads & Sockets<br/>(10W Light 1, 10W Light 2, 65W AC Socket, Aux/Spare)"]
+        RelayBoard["2-Channel 5V Relay Module<br/>(PC817 Optocouplers + 1N4007 Diodes)"]
+        WallSwitches["2x Physical SPST Switches<br/>(Logical 2-Way Edge Sensing)"]
+        MainsAC["220V AC Mains Distribution<br/>(Fused Bus, Dual E27 Sockets)"]
+        Appliances["Physical Loads<br/>(10W Ceiling Light 1, 10W Ceiling Light 2)"]
 
-        WallSwitches -->|GPIO 32-35 Debounced| ESP32
-        ESP32 -->|GPIO 16-19 Actuation| RelayBoard
+        WallSwitches -->|GPIO 35 & 32 Debounced| ESP32
+        ESP32 -->|GPIO 22 & 23 Actuation| RelayBoard
         RelayBoard -->|COM / NO Contact Closure| MainsAC
         MainsAC --> Appliances
     end
@@ -257,20 +257,16 @@ The GPIO pin assignment table is a **strict hardware-firmware contract** (TRD §
 
 | Logical Channel | Function | ESP32 GPIO | Electrical Mode | Target Appliance / Physical Load |
 | :---: | :---: | :---: | :--- | :--- |
-| **Channel 1** | Relay Actuation Output | **GPIO 16** | Digital Output (Active-HIGH) | 10W Ceiling Light 1 (E27 Lamp Socket) |
-| **Channel 2** | Relay Actuation Output | **GPIO 17** | Digital Output (Active-HIGH) | 10W Ceiling Light 2 (E27 Lamp Socket) |
-| **Channel 3** | Relay Actuation Output | **GPIO 18** | Digital Output (Active-HIGH) | Workstation Socket (Standard 3-Pin AC Socket, 65W) |
-| **Channel 4** | Relay Actuation Output | **GPIO 19** | Digital Output (Active-HIGH) | Auxiliary / Spare (Relay 4 Screw Terminal, 0W) |
-| **Channel 1** | Physical Switch Input | **GPIO 32** | Digital Input (Internal `INPUT_PULLUP`) | Ceiling Light 1 Manual Toggle |
-| **Channel 2** | Physical Switch Input | **GPIO 33** | Digital Input (Internal `INPUT_PULLUP`) | Ceiling Light 2 Manual Toggle |
-| **Channel 3** | Physical Switch Input | **GPIO 34** | Digital Input (`INPUT` + External 10kΩ Pull-Up) | Workstation Socket Manual Toggle |
-| **Channel 4** | Physical Switch Input | **GPIO 35** | Digital Input (`INPUT` + External 10kΩ Pull-Up) | Auxiliary / Spare Manual Toggle |
+| **Channel 1** | Relay Actuation Output | **GPIO 22** | Digital Output (Active-HIGH) | 10W Ceiling Light 1 (E27 Lamp Socket) |
+| **Channel 2** | Relay Actuation Output | **GPIO 23** | Digital Output (Active-HIGH) | 10W Ceiling Light 2 (E27 Lamp Socket) |
+| **Channel 1** | Physical Switch Input | **GPIO 35** | Digital Input (`INPUT` + External 10kΩ Pull-Up) | Ceiling Light 1 Manual Toggle |
+| **Channel 2** | Physical Switch Input | **GPIO 32** | Digital Input (Internal `INPUT_PULLUP`) | Ceiling Light 2 Manual Toggle |
 
 ---
 
 ### Relay Driver, Optocoupler Isolation & Flyback Protection
 
-Commercial 4-channel relay modules use **PC817 optocouplers** to provide galvanic isolation between the microcontroller and the relay coils:
+Commercial relay modules use **PC817 optocouplers** to provide galvanic isolation between the microcontroller and the relay coils:
 
 1. **Optocoupler Power Jumper (`VCC-JDVCC`)**:
    * **Crucial Step**: Remove the factory-installed yellow jumper shunt bridging `VCC` and `JD-VCC`.
@@ -288,12 +284,12 @@ Commercial 4-channel relay modules use **PC817 optocouplers** to provide galvani
 ### Input Pin Quirks & External Pull-Up Network
 
 The ESP32 silicon has specific hardware constraints on higher GPIOs:
-* **GPIO 32 and 33**: Bidirectional GPIOs equipped with internal software-configurable pull-up and pull-down resistors (~45kΩ). In firmware, they are initialized via `pinMode(pin, INPUT_PULLUP)`.
-* **GPIO 34 and 35**: **Input-only pins (GPI)** lacking internal pull-up or pull-down resistors in the ESP32 hardware.
+* **GPIO 32**: Bidirectional GPIO equipped with internal software-configurable pull-up and pull-down resistors (~45kΩ). In firmware, it is initialized via `pinMode(32, INPUT_PULLUP)`.
+* **GPIO 35**: **Input-only pin (GPI)** lacking internal pull-up or pull-down resistors in the ESP32 hardware.
 * **External Pull-Up Wiring**:
-  * Connect a **10kΩ resistor** between `GPIO 34` and the **+3.3V Logic Rail**.
-  * Connect a second **10kΩ resistor** between `GPIO 35` and the **+3.3V Logic Rail**.
-  * Wire the physical switches between the GPIO pin and the **Common Ground Bus (GND)**.
+  * Connect a **10kΩ resistor** between `GPIO 35` and the **+3.3V Logic Rail**.
+  * Wire the physical toggle switch between `GPIO 35` and the **Common Ground Bus (GND)**.
+  * In firmware, initialize via `pinMode(35, INPUT)`.
   * When the switch is open, the pin is pulled securely to 3.3V (`HIGH`). When the switch is closed, the pin is pulled to GND (`LOW`).
 
 ---
@@ -368,15 +364,15 @@ Switches::tick([](uint8_t channel, bool) {
 ### Step-by-Step Hardware Assembly Runbook
 
 1. **Step 1: Enclosure Preparation**  
-   Drill mounting holes in the ABS enclosure for 4 E27 lamp holders, 4 toggle switches, 1 master DPST switch, and 2 cable glands. Install nylon standoffs for the ESP32 and relay boards.
+   Drill mounting holes in the ABS enclosure for 2 E27 lamp holders, 2 toggle switches, 1 master DPST switch, and 2 cable glands. Install nylon standoffs for the ESP32 and relay board.
 2. **Step 2: Low-Voltage DC Bus Assembly**  
-   Mount the ESP32 and 4-channel relay board. Wire the Common Ground Bus tying ESP32 GND, Relay GND, and DC Power Supply GND together.
+   Mount the ESP32 and 2-channel relay board. Wire the Common Ground Bus tying ESP32 GND, Relay GND, and DC Power Supply GND together.
 3. **Step 3: Pull-Up Network & Switch Wiring**  
-   Solder 10kΩ pull-up resistors from +3.3V to GPIO 34 and GPIO 35. Connect one terminal of each SPST switch to GPIO 32, 33, 34, 35 respectively, and the opposing terminal to the Common Ground Bus.
+   Solder a 10kΩ pull-up resistor from +3.3V to GPIO 35. Connect one terminal of Switch 1 to GPIO 35 and one terminal of Switch 2 to GPIO 32. Connect opposing terminals of both switches to the Common Ground Bus.
 4. **Step 4: Relay Control Interconnects**  
-   Connect ESP32 GPIO 16, 17, 18, 19 to relay input pins IN1, IN2, IN3, IN4. Connect the 5V power supply output to relay `JD-VCC`, and ESP32 3.3V to relay `VCC` with the jumper removed.
+   Connect ESP32 GPIO 22 and 23 to relay input pins IN1 and IN2. Connect the 5V power supply output to relay `JD-VCC`, and ESP32 3.3V to relay `VCC` with the jumper removed.
 5. **Step 5: High-Voltage AC Mains Wiring**  
-   Pass the AC power cord through the strain-relief cable gland. Route Live through the Master DPST switch and 5A fuse. Daisy-chain Live into relay COM terminals 1–4. Connect each NO terminal to the center contact of each E27 socket. Connect Neutral to the threaded outer contact of each E27 socket. Insulate all AC joints with dual-wall heat-shrink tubing.
+   Pass the AC power cord through the strain-relief cable gland. Route Live through the Master DPST switch and 5A fuse. Daisy-chain Live into relay COM terminals 1–2. Connect each NO terminal to the center contact of each E27 socket. Connect Neutral to the threaded outer contact of each E27 socket. Insulate all AC joints with dual-wall heat-shrink tubing.
 
 ---
 
@@ -391,12 +387,12 @@ Execute these verification checks before connecting 220V AC mains power:
   * Power only the 5V DC supply (with mains isolated from relay contacts).
   * Measure voltage across ESP32 VIN and GND: Must read **$5.0\text{V} \pm 0.2\text{V}$**.
   * Measure voltage across ESP32 3V3 pin and GND: Must read **$3.3\text{V} \pm 0.1\text{V}$**.
-  * Measure GPIO 34 and 35: Must read **$3.3\text{V}$** (confirming 10kΩ pull-up integrity).
+  * Measure GPIO 35: Must read **$3.3\text{V}$** (confirming 10kΩ pull-up integrity).
 * [ ] **Cold Actuation Click Test**:
-  * Flash firmware. Flip physical switches 1–4 one by one. Confirm distinct, crisp audible mechanical clicks from each relay.
+  * Flash firmware. Flip physical switches 1–2 one by one. Confirm distinct, crisp audible mechanical clicks from each relay.
 * [ ] **Live Mains Load Test**:
-  * Insert 4 LED test bulbs into the sockets. Connect AC mains power cord. Flip Master Switch ON.
-  * Verify each channel turns ON and OFF reliably via physical switch flips and web commands.
+  * Insert 2 LED test bulbs into the sockets. Connect AC mains power cord. Flip Master Switch ON.
+  * Verify each ceiling light turns ON and OFF reliably via physical switch flips and web commands.
 
 ---
 
@@ -652,7 +648,7 @@ graph LR
 > 1. **Never Commit Secrets**: No secrets, tokens, or live credentials may ever be committed to source control.
 > 2. **Never Touch `.env` in Code**: Automated scripts and assistants must maintain `.env.template` only.
 > 3. **Strict Zero-Comments Rule**: All code, configuration, and scripts must contain zero comments of any kind (no inline comments, ASCII headers, or dividers) except required framework API docstrings.
-> 4. **Fixed GPIO Contract**: The GPIO pin mapping (`16-19` for Relays, `32-35` for Switches) is locked to physical hardware wiring.
+> 4. **Fixed GPIO Contract**: The GPIO pin mapping (`22-23` for Relays, `35` and `32` for Switches) is locked to physical hardware wiring.
 > 5. **Contact Debounce**: The 1000ms contact protection debounce window must never be bypassed.
 > 6. **Account Lockout**: 5 consecutive failed login attempts trigger an immediate 15-minute account lockout.
 > 7. **Broker Isolation**: The ESP32 is restricted via Mosquitto ACLs to its own device topics (`office/esp32_prototype_01/#`) and cannot publish to administrative or other device queues.

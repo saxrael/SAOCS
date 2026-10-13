@@ -18,7 +18,7 @@ MQTT_DEVICE_ID = os.getenv("MQTT_DEVICE_ID", DEFAULT_DEV_ID)
 SIMULATION_PORT = int(os.getenv("SIMULATION_PORT", "8099"))
 SIMULATION_HOST = os.getenv("SIMULATION_HOST", "0.0.0.0")
 NVS_FILE_PATH = os.getenv("NVS_FILE_PATH", "data/simulated_nvs.json")
-RELAY_COUNT = 4
+RELAY_COUNT = int(os.getenv("RELAY_COUNT", "2"))
 RELAY_COOLDOWN_MS = 1000
 
 

@@ -18,10 +18,10 @@ SwitchChannel channels[SWITCH_COUNT];
 
 void begin() {
     for (uint8_t i = 0; i < SWITCH_COUNT; ++i) {
-        if (i < 2) {
-            pinMode(SWITCH_PINS[i], INPUT_PULLUP);
-        } else {
+        if (SWITCH_PINS[i] >= 34) {
             pinMode(SWITCH_PINS[i], INPUT);
+        } else {
+            pinMode(SWITCH_PINS[i], INPUT_PULLUP);
         }
 
         bool initialReading = (digitalRead(SWITCH_PINS[i]) == HIGH);

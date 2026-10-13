@@ -14,7 +14,7 @@ namespace MqttManager {
 
 namespace {
 
-espMqttClient client;
+espMqttClient client(espMqttClientTypes::UseInternalTask::NO);
 uint32_t lastMqttAttemptMs = 0;
 
 char topicCommand[64];

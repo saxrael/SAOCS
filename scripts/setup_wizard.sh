@@ -148,7 +148,7 @@ step "Image: Select Canonical Ubuntu 22.04 or 24.04 Minimal."
 step "Networking: Select or create your VCN public subnet, assign a public IP."
 step "SSH Keys: Save private key locally (e.g. ~/.ssh/saocs_oci_key) and upload the public key."
 step "Click 'Create'. Once running, go to Networking > Reserved Public IPs and assign a static IP."
-step "In VCN Security List, open Ingress ports: 80 (HTTP), 443 (HTTPS), 8883 (MQTT TLS), 22 (SSH)."
+step "In VCN Security List, open Ingress ports: 80 (HTTP), 443 (HTTPS), 1883 (MQTT), 8883 (MQTT TLS), 22 (SSH)."
 pause "Press Enter after the VM is created with its reserved static IP."
 
 ask OCI_STATIC_IP "Enter the Reserved Static Public IP of your OCI VM:"

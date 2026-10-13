@@ -14,7 +14,7 @@ static constexpr char NVS_RELAY_KEYS[2][3] = {"r1", "r2"};
 static constexpr char MQTT_TOPIC_PREFIX[] = "office";
 static constexpr uint32_t WIFI_RECONNECT_INTERVAL_MS = 5000;
 static constexpr uint32_t MQTT_RECONNECT_INTERVAL_MS = 5000;
-static constexpr uint16_t MQTT_KEEPALIVE_SECONDS = 15;
+static constexpr uint16_t MQTT_KEEPALIVE_SECONDS = 60;
 
 #ifndef WIFI_SSID
 #define WIFI_SSID ""

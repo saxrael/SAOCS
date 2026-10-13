@@ -1,3 +1,7 @@
+FROM caddy:builder-alpine AS caddy-builder
+ENV GOMAXPROCS=1
+RUN xcaddy build --with github.com/caddy-dns/duckdns
+
 FROM node:20-alpine AS frontend-builder
 
 WORKDIR /build
@@ -7,9 +11,6 @@ RUN npm ci
 
 COPY frontend/ .
 RUN npm run build
-
-FROM caddy:builder-alpine AS caddy-builder
-RUN xcaddy build --with github.com/caddy-dns/duckdns
 
 FROM caddy:alpine
 

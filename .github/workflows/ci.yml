@@ -116,8 +116,15 @@ jobs:
           host: ${{ secrets.OCI_VM_HOST }}
           username: ${{ secrets.OCI_DEPLOY_USER }}
           key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          command_timeout: 30m
           envs: DUCKDNS_DOMAIN,DUCKDNS_SUBDOMAIN,DUCKDNS_TOKEN,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,FRONTEND_URL,VITE_API_BASE_URL,ALLOWED_ORIGINS,MQTT_BACKEND_PASSWORD,MQTT_DEVICE_PASSWORD,OTA_PASSWORD,WIFI_SSID,WIFI_PASSWORD,OCI_STATIC_IP,GIT_SHA
           script: |
+            if ! swapon --show | grep -q '/swapfile'; then
+              sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+            fi
             cd /opt/saocs
             git fetch origin main
             git reset --hard origin/main
@@ -171,7 +178,8 @@ jobs:
             persistence_location /mosquitto/data/
             log_dest stdout
             EOF_MOSQ
-            GIT_SHA=${{ github.sha }} docker compose build --no-cache
+            GIT_SHA=${{ github.sha }} docker compose build backend
+            GIT_SHA=${{ github.sha }} docker compose build caddy
             GIT_SHA=${{ github.sha }} docker compose up -d --remove-orphans
             if [ -n "$DUCKDNS_DOMAIN" ] && [ "$DUCKDNS_DOMAIN" != "your-subdomain.duckdns.org" ]; then
               for i in $(seq 1 30); do

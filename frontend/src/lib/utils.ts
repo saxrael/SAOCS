@@ -27,7 +27,12 @@ export function computeDailyEnergy(
         onTime = startOfDay
       }
     } else if (appliance.state?.current_state === "ON" && todayLogs.length === 0) {
-      onTime = startOfDay
+      if (appliance.state.last_changed_at) {
+        const changedTime = new Date(appliance.state.last_changed_at).getTime()
+        onTime = Math.max(startOfDay, changedTime)
+      } else {
+        onTime = startOfDay
+      }
     }
 
     for (const log of todayLogs) {
@@ -60,4 +65,11 @@ export function formatDateTime(isoString: string): string {
 
 export function formatDate(isoString: string): string {
   return new Date(isoString).toLocaleDateString()
+}
+
+export function formatKwh(kwh: number): string {
+  if (kwh > 0 && kwh < 0.01) {
+    return kwh.toFixed(4)
+  }
+  return kwh.toFixed(2)
 }

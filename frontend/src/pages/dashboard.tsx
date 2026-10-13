@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Zap, CircleDollarSign } from "lucide-react"
 import { listAppliances } from "@/api/appliances"
@@ -6,20 +7,32 @@ import { ApplianceTile } from "@/components/appliance-tile"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { PageHeader } from "@/components/page-header"
 import { ErrorInline } from "@/components/error-inline"
-import { computeDailyEnergy } from "@/lib/utils"
+import { computeDailyEnergy, formatKwh } from "@/lib/utils"
 
 export function DashboardPage() {
+  const [, setTick] = useState(0)
+
   const { data: appliances, isLoading: isAppliancesLoading, error: appliancesError } = useQuery({
     queryKey: ["appliances"],
     queryFn: listAppliances,
   })
 
-  const { data: logs } = useQuery({
+  const { data: logs, isLoading: isLogsLoading } = useQuery({
     queryKey: ["activity-log", { limit: 100 }],
     queryFn: () => listActivityLogs({ limit: 100 }),
   })
 
-  if (isAppliancesLoading) {
+  const hasActiveAppliance = appliances?.some((a) => a.state?.current_state === "ON")
+
+  useEffect(() => {
+    if (!hasActiveAppliance) return
+    const timer = setInterval(() => {
+      setTick((prev) => prev + 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [hasActiveAppliance])
+
+  if (isAppliancesLoading || isLogsLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -58,7 +71,7 @@ export function DashboardPage() {
                 Est. Today Energy
               </div>
               <div className="text-lg font-bold font-(--font-mono) text-(--color-accent)">
-                {totalKwh.toFixed(2)} <span className="text-xs text-(--color-foreground-2)">kWh</span>
+                {formatKwh(totalKwh)} <span className="text-xs text-(--color-foreground-2)">kWh</span>
               </div>
             </div>
           </div>

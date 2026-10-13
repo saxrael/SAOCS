@@ -34,6 +34,8 @@ export function useWebSocket() {
         if (!isMounted) return
         setStatus("CONNECTED")
         backoffRef.current = 1000
+        queryClient.invalidateQueries({ queryKey: ["appliances"] })
+        queryClient.invalidateQueries({ queryKey: ["activity-log"] })
       }
 
       ws.onmessage = (event) => {

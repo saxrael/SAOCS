@@ -12,6 +12,11 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.execute(
         sa.text(
+            "UPDATE appliances SET relay_channel = -id"
+        )
+    )
+    op.execute(
+        sa.text(
             "UPDATE appliances "
             "SET name = 'Ceiling Light 1', relay_channel = 1, assumed_wattage_watts = 10.0 "
             "WHERE id = 1"

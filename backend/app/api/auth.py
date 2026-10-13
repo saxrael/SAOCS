@@ -41,7 +41,13 @@ async def google_callback(
     request: Request,
     session: AsyncSession = Depends(get_db),
 ):
-    token = await oauth.google.authorize_access_token(request)
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Google OAuth failed: {str(exc)}",
+        )
     user_info = token.get("userinfo")
     if not user_info:
         user_info = await oauth.google.userinfo(token=token)

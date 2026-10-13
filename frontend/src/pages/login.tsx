@@ -22,6 +22,11 @@ export function LoginPage() {
     const token = searchParams.get("access_token")
     const refreshToken = searchParams.get("refresh_token")
     const setupToken = searchParams.get("setup_token")
+    const authError = searchParams.get("error")
+
+    if (authError) {
+      setError(authError)
+    }
 
     if (setupToken) {
       navigate(`/setup-password?token=${encodeURIComponent(setupToken)}`, { replace: true })
@@ -57,8 +62,8 @@ export function LoginPage() {
     <div className="min-h-screen bg-(--color-background) flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-(--color-surface) rounded-(--radius-lg) border border-(--color-border) p-8 shadow-(--shadow-card)">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-(--color-surface-2) border border-(--color-border) mb-3">
-            <span className="w-4 h-4 rounded-full bg-(--color-accent)" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-(--color-surface-2) border border-(--color-border) mb-3 p-2 shadow-xs">
+            <img src="/logo.svg" alt="SAOCS Logo" className="w-full h-full rounded-lg object-contain" />
           </div>
           <h1 className="text-2xl font-bold font-(--font-display) tracking-tight text-(--color-foreground)">
             SAOCS

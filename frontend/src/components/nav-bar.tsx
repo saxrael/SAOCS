@@ -18,7 +18,7 @@ export function NavBar() {
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-8">
             <NavLink to="/" className="flex items-center gap-2.5 group focus:outline-none focus:ring-2 focus:ring-(--color-ring) rounded-md p-1">
-              <span className="w-3 h-3 rounded-full bg-(--color-accent)" />
+              <img src="/logo.svg" alt="SAOCS Logo" className="w-7 h-7 rounded-md shrink-0 object-contain shadow-xs" />
               <span className="font-bold text-lg tracking-wider font-(--font-display) text-(--color-foreground)">
                 SAOCS
               </span>

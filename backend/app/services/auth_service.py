@@ -16,8 +16,7 @@ oauth.register(
     name="google",
     client_id=settings.google_client_id,
     client_secret=settings.google_client_secret,
-    authorize_url="https://accounts.google.com/o/oauth2/v2/auth",
-    access_token_url="https://oauth2.googleapis.com/token",
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"},
 )
 

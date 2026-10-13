@@ -15,4 +15,15 @@ export interface DeviceStatusEvent {
   timestamp: string
 }
 
-export type WebSocketMessage = StateChangeEvent | DeviceStatusEvent
+export interface ScheduleExecutedEvent {
+  event: "schedule_executed"
+  schedule_id: number
+  appliance_id: number
+  action: string
+  timestamp: string
+}
+
+export type WebSocketMessage =
+  | StateChangeEvent
+  | DeviceStatusEvent
+  | ScheduleExecutedEvent

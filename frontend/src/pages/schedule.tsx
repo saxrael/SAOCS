@@ -6,6 +6,7 @@ import { listSchedules, createSchedule, deleteSchedule } from "@/api/schedules"
 import { PageHeader } from "@/components/page-header"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { ErrorInline } from "@/components/error-inline"
+import { parseUtcDate } from "@/lib/utils"
 
 export function SchedulePage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -204,7 +205,7 @@ export function SchedulePage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 font-(--font-mono) text-xs text-(--color-foreground-2)">
-                        {new Date(schedule.scheduled_time).toLocaleString()}
+                        {parseUtcDate(schedule.scheduled_time).toLocaleString()}
                       </td>
                       <td className="py-3.5 px-4 text-xs">
                         {isExecuted ? (

@@ -9,6 +9,7 @@ from app.api.router import api_router
 from app.config import settings
 from app.database import Base, engine
 from app.services.mqtt_service import mqtt_service
+from app.services.scheduler import scheduler_service
 
 
 @asynccontextmanager
@@ -21,7 +22,9 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await mqtt_service.start()
+    await scheduler_service.start()
     yield
+    await scheduler_service.stop()
     await mqtt_service.stop()
 
 app = FastAPI(

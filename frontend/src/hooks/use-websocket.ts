@@ -36,6 +36,7 @@ export function useWebSocket() {
         backoffRef.current = 1000
         queryClient.invalidateQueries({ queryKey: ["appliances"] })
         queryClient.invalidateQueries({ queryKey: ["activity-log"] })
+        queryClient.invalidateQueries({ queryKey: ["schedules"] })
       }
 
       ws.onmessage = (event) => {
@@ -60,6 +61,8 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ["activity-log"] })
           } else if (message.event === "device_status") {
             queryClient.setQueryData(["device_status", message.device_id], message.status)
+          } else if (message.event === "schedule_executed") {
+            queryClient.invalidateQueries({ queryKey: ["schedules"] })
           }
         } catch {
         }

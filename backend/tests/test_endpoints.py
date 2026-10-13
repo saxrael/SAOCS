@@ -1,11 +1,15 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
 
 from app.models.activity_log import ActivityLog
 from app.models.appliance import Appliance
+from app.models.schedule import Schedule
 from app.models.user import User
+from app.services.mqtt_service import mqtt_service
+from app.services.scheduler import scheduler_service
 
 
 @pytest.mark.asyncio
@@ -115,3 +119,32 @@ async def test_schedules_crud(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert delete_res.status_code == 204
+
+@pytest.mark.asyncio
+async def test_scheduler_process_due_schedules(
+    sample_appliance: Appliance,
+    db_session,
+):
+    past_time = datetime.now(UTC) - timedelta(minutes=5)
+    schedule = Schedule(
+        appliance_id=sample_appliance.id,
+        action="ON",
+        scheduled_time=past_time,
+    )
+    db_session.add(schedule)
+    await db_session.commit()
+    await db_session.refresh(schedule)
+
+    with patch.object(mqtt_service, "publish_command", AsyncMock()) as mock_cmd:
+        with patch("app.services.scheduler.async_session_maker") as mock_maker:
+            mock_maker.return_value.__aenter__.return_value = db_session
+            await scheduler_service.process_due_schedules()
+            mock_cmd.assert_awaited_once_with(
+                device_id=sample_appliance.device_id,
+                channel=sample_appliance.relay_channel,
+                state="ON",
+                actor_user_id=None,
+            )
+
+    await db_session.refresh(schedule)
+    assert schedule.executed_at is not None

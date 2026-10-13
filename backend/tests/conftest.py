@@ -10,6 +10,7 @@ from app.models.appliance import Appliance, ApplianceState
 from app.models.user import User
 from app.services.auth_service import create_access_token, hash_password
 from app.services.mqtt_service import mqtt_service
+from app.services.scheduler import scheduler_service
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +22,8 @@ def reset_mqtt_state():
     with (
         patch.object(mqtt_service, "start", AsyncMock()),
         patch.object(mqtt_service, "stop", AsyncMock()),
+        patch.object(scheduler_service, "start", AsyncMock()),
+        patch.object(scheduler_service, "stop", AsyncMock()),
     ):
         yield
     mqtt_service.last_command_time.clear()

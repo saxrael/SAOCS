@@ -11,7 +11,7 @@ export function PasswordSetupPage() {
   const [searchParams] = useSearchParams()
   const { setupPassword } = useAuth()
   const navigate = useNavigate()
-  const setupToken = searchParams.get("token")
+  const setupToken = searchParams.get("setup_token") || searchParams.get("token")
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()

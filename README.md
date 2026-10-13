@@ -3,11 +3,11 @@
 > **An enterprise-grade, edge-resilient IoT platform for remote monitoring, scheduling, and two-way manual override of office appliances via MQTT, FastAPI, React, and ESP32 microcontrollers.**
 
 [![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-passing-brightgreen?style=flat-square&logo=githubactions)](https://github.com/saxrael/SAOCS/actions)
-[![Firmware](https://img.shields.io/badge/PlatformIO-ESP32%20Arduino-blue?style=flat-square&logo=platformio)](https://platformio.org/)
-[![Backend Tests](https://img.shields.io/badge/Pytest-50%2F50%20Passed-success?style=flat-square&logo=pytest)](file:///backend/tests)
-[![Frontend Tests](https://img.shields.io/badge/Vitest-67%2F67%20Passed-success?style=flat-square&logo=vitest)](file:///frontend/src/test)
-[![Code Style](https://img.shields.io/badge/Code%20Style-Strict%20Zero--Comments-blueviolet?style=flat-square)](file:///scripts/audit_zero_comments.py)
-[![License](https://img.shields.io/badge/License-Academic%20Capstone-orange?style=flat-square)](file:///docs/Project_Summary.md)
+[![Firmware](https://img.shields.io/badge/PlatformIO-3%2F3%20Targets%20Passed-blue?style=flat-square&logo=platformio)](firmware/platformio.ini)
+[![Backend Tests](https://img.shields.io/badge/Pytest-51%2F51%20Passed-success?style=flat-square&logo=pytest)](backend/tests)
+[![Frontend Tests](https://img.shields.io/badge/Vitest-69%2F69%20Passed-success?style=flat-square&logo=vitest)](frontend/src/test)
+[![Code Style](https://img.shields.io/badge/Code%20Style-Strict%20Zero--Comments-blueviolet?style=flat-square)](scripts/audit_zero_comments.py)
+[![License](https://img.shields.io/badge/License-Academic%20Capstone-orange?style=flat-square)](docs/Project_Summary.md)
 
 ---
 
@@ -26,6 +26,7 @@
   - [Two-Way Logical Toggle Switch (XOR Edge Inversion)](#two-way-logical-toggle-switch-xor-edge-inversion)
   - [Step-by-Step Hardware Assembly Runbook](#step-by-step-hardware-assembly-runbook)
   - [Hardware Commissioning & Cold-Smoke Multimeter Protocol](#hardware-commissioning--cold-smoke-multimeter-protocol)
+- [Automated Scheduling Engine](#automated-scheduling-engine)
 - [Firmware Architecture & Flashing Guide](#firmware-architecture--flashing-guide)
 - [Database & Schema](#database--schema)
 - [Environment Configuration & Secrets](#environment-configuration--secrets)
@@ -46,12 +47,16 @@ graph TB
     subgraph CloudVPS["Cloud VPS / Host (Docker Compose)"]
         Caddy["Caddy Reverse Proxy<br/>(DuckDNS TLS & Static SPA)"]
         FastAPI["FastAPI Backend<br/>(REST API & WebSocket Push)"]
+        Scheduler["Async Scheduler Engine<br/>(FastAPI Lifespan Due Poller)"]
         Mosquitto["Eclipse Mosquitto 2.x<br/>(MQTTS Broker with ACLs)"]
         SQLite[("SQLite Database<br/>WAL Mode + Alembic")]
         
         Caddy -->|HTTPS / WSS| FastAPI
         FastAPI -->|aiosqlite| SQLite
         FastAPI <-->|aiomqtt QoS 1| Mosquitto
+        Scheduler -->|Poll Due Schedules| SQLite
+        Scheduler -->|Dispatch Due Commands| Mosquitto
+        Scheduler -.->|Broadcast Event| FastAPI
     end
 
     subgraph ClientBrowser["Client Dashboard"]
@@ -66,7 +71,7 @@ graph TB
         Appliances["Physical Loads<br/>(10W Ceiling Light 1, 10W Ceiling Light 2)"]
 
         WallSwitches -->|GPIO 35 & 32 Debounced| ESP32
-        ESP32 -->|GPIO 22 & 23 Actuation| RelayBoard
+        ESP32 -->|GPIO 22 & 23 Active-LOW| RelayBoard
         RelayBoard -->|COM / NO Contact Closure| MainsAC
         MainsAC --> Appliances
     end
@@ -85,12 +90,12 @@ graph TB
 
 ## ⚡ Key Features
 
-* **Multi-Channel Appliance Control**: Independent actuation of 4 distinct office appliance channels (Lighting, Ventilation, Computing, Pumping).
+* **Dual-Channel Appliance Control**: Independent actuation of 2 dedicated office lighting channels (10W Ceiling Light 1 on GPIO 22 and 10W Ceiling Light 2 on GPIO 23) with optocoupled galvanic isolation.
 * **Logical Two-Way (XOR) Switching**: Physical wall switches toggle appliance states on every flip (rising or falling edge) regardless of previous web dashboard commands.
-* **Real-Time WebSocket Synchronization**: Sub-second UI updates pushed immediately upon physical actuation or cloud commands.
-* **Audit-Grade Forensic Logging**: Every state transition is recorded in SQLite with event type (`POWER_ON`/`POWER_OFF`), origin (`switch`, `web`, `schedule`), and actor ID.
-* **Energy & Financial Analytics**: Real-time energy consumption (kWh) and billing estimates based on Kaduna Electric Band A tariff (₦209.5/kWh).
-* **Automated Scheduling Engine**: In-process background scheduler for time-based appliance activation and cutoff.
+* **Real-Time WebSocket Synchronization**: Sub-second UI updates pushed immediately upon physical actuation, cloud commands, or scheduled executions (`state_change`, `device_status`, and `schedule_executed` events).
+* **Audit-Grade Forensic Logging**: Every state transition is recorded in SQLite with event type (`POWER_ON`/`POWER_OFF`), origin (`switch`, `command`, `schedule`), and actor ID.
+* **Energy & Financial Analytics**: Real-time energy consumption (kWh) with 4-decimal precision for low-wattage LEDs and billing estimates based on Kaduna Electric Band A tariff (₦209.5/kWh).
+* **Automated Scheduling Engine**: In-process background scheduler running within the FastAPI application lifespan for time-based appliance activation and cutoff.
 * **Enterprise Security**: Google OAuth2 + password fallback, bcrypt hashing, JWT access/refresh rotation, Mosquitto per-device ACL isolation, and account lockout protection.
 
 ---
@@ -118,17 +123,18 @@ graph TB
 ```
 SAOCS/
 ├── backend/                        # FastAPI REST API, WebSocket service, and database models
+│   ├── alembic/                    # Alembic database migration environment and revisions
+│   │   └── versions/               # Revisions 001, 002, 003, and 004
 │   ├── app/
-│   │   ├── api/                    # API route endpoints (auth, appliances, schedule, logs)
-│   │   ├── models/                 # SQLAlchemy ORM models (User, Appliance, ActivityLog, etc.)
+│   │   ├── api/                    # API route endpoints (auth, appliances, schedule, logs, health)
+│   │   ├── models/                 # SQLAlchemy ORM models (User, Appliance, ApplianceState, ActivityLog, Schedule)
 │   │   ├── schemas/                # Pydantic v2 validation schemas
-│   │   ├── services/               # MQTT client service, WebSocket connection manager, scheduler
+│   │   ├── services/               # MQTT client service, WebSocket manager, scheduler engine
 │   │   ├── config.py               # Pydantic application settings
 │   │   ├── database.py             # Async engine and session factory
 │   │   └── main.py                 # FastAPI lifespan application entry point
-│   ├── migrations/                 # Alembic database migration revisions
-│   ├── tests/                      # Pytest suite (unit, API, concurrency, security)
-│   ├── Dockerfile                  # Multi-stage non-root container build
+│   ├── tests/                      # Pytest suite (51 tests covering auth, endpoints, concurrency, NVS)
+│   ├── Dockerfile                  # Multi-stage non-root container build (uv-based)
 │   └── pyproject.toml              # Backend dependency declarations (uv-managed)
 ├── caddy/                          # Caddy reverse proxy configuration & custom Dockerfile
 │   ├── Caddyfile                   # DuckDNS DNS-01 ACME TLS and reverse proxy rules
@@ -147,12 +153,12 @@ SAOCS/
 │   └── Viva_Voce_Defense_Guide.md  # 18-question comprehensive academic viva defense guide
 ├── firmware/                       # PlatformIO embedded C/C++ firmware project
 │   ├── include/
-│   │   └── config.h                # GPIO pin contracts, timings, and network constants
+│   │   └── config.h                # GPIO pin contracts, timings, active-LOW polarity, network constants
 │   ├── src/
 │   │   ├── main.cpp                # Main setup and loop orchestrator
 │   │   ├── mqtt_client.cpp         # espMqttClient wrapper, state publisher, command subscriber
 │   │   ├── ota.cpp                 # ArduinoOTA authenticated wireless updater
-│   │   ├── relays.cpp              # Relay driver, 1000ms cooldown queue, and state arbiter
+│   │   ├── relays.cpp              # Relay driver, active-LOW logic, 1000ms cooldown queue, state arbiter
 │   │   ├── serial_harness.cpp      # Bounded serial test and CLI harness
 │   │   ├── storage.cpp             # Preferences NVS flash persistence driver
 │   │   ├── switches.cpp            # 50ms debounced input scanner with edge detection
@@ -162,15 +168,16 @@ SAOCS/
 ├── frontend/                       # React 19 + TypeScript web application
 │   ├── src/
 │   │   ├── api/                    # Typed API client, authentication interceptors, token refresh
-│   │   ├── components/             # Accessible UI components (ApplianceCard, Header, Navbar)
-│   │   ├── contexts/               # AuthContext, WebSocketContext
+│   │   ├── components/             # Accessible UI components (ApplianceCard, Header, Navbar, etc.)
+│   │   ├── context/                # AuthContext, WebSocketContext
 │   │   ├── pages/                  # Dashboard, Login, Schedules, ActivityLog, ManageUsers
-│   │   └── test/                   # Vitest unit and integration tests
+│   │   ├── types/                  # TypeScript interface definitions (appliances, websocket, etc.)
+│   │   └── test/                   # Vitest unit and integration test suite (69 tests)
 │   ├── package.json                # Frontend scripts and pinned dependencies
 │   └── vite.config.ts              # Vite bundler configuration with Tailwind CSS v4 plugin
 ├── mosquitto/                      # Mosquitto message broker configuration
 │   ├── acl/acl.conf                # Per-device topic isolation ACLs
-│   └── config/mosquitto.conf       # Listener ports (1883 internal, 8883 MQTTS TLS)
+│   └── config/mosquitto.conf       # Listener ports (1883 TCP broker & 8883 MQTTS TLS)
 ├── presentation/                   # Academic defense deliverables
 │   └── defense_deck.pptx           # 14-slide defense slide deck with speaker notes
 ├── scripts/                        # Operational, testing, and deployment scripts
@@ -187,27 +194,26 @@ SAOCS/
 
 ## 🔌 Complete Hardware Engineering & Build Guide
 
-> **For the full, step-by-step engineering and fabrication manual with wiring diagrams, multimeter commissioning protocols, and safety checklists, see [`docs/Hardware_Build_Guide.md`](file:///docs/Hardware_Build_Guide.md).**
+> **For the full, step-by-step engineering and fabrication manual with wiring diagrams, multimeter commissioning protocols, and safety checklists, see [`docs/Hardware_Build_Guide.md`](docs/Hardware_Build_Guide.md).**
 
 ### Hardware Bill of Materials (BOM)
 
 | Item | Component | Specification / Model | Qty | Function |
 | :---: | :--- | :--- | :---: | :--- |
 | **1** | Microcontroller Module | ESP32-WROOM-32 (30-pin or 38-pin DevKit V1) | 1 | Edge processor, Wi-Fi radio, GPIO control |
-| **2** | Relay Board Module | 4-Channel 5V Relay Board with PC817 Optocouplers (Songle SRD-05VDC-SL-C) | 1 | 250V AC / 10A galvanic switching |
+| **2** | Relay Board Module | 2-Channel 5V Relay Board with PC817 Optocouplers (Songle SRD-05VDC-SL-C) | 1 | 250V AC / 10A galvanic switching |
 | **3** | Power Supply | 5V DC / 2A Regulated Switching Power Supply (or Hi-Link HLK-PM01 AC-DC module) | 1 | Low-voltage DC system power |
 | **4** | Ceiling Lamp Sockets | E27 Batten Ceramic / Bakelite Lamp Sockets | 2 | Physical fixtures for 10W ceiling bulbs (Channels 1 & 2) |
 | **5** | LED Bulbs | 10W 220V AC E27 LED Bulbs (Warm / Daylight White) | 2 | Physical lighting loads for Channels 1 and 2 |
-| **6** | AC Wall Socket | Single-Gang 3-Pin Switched Socket (UK BS 1363 Type G, 250V 13A) | 1 | Workstation utility socket for Channel 3 |
-| **7** | Wall Toggle Switches | Single-Pole Single-Throw (SPST) Toggle or Rocker Switches (250V / 6A rated) | 4 | Manual appliance override controls |
-| **8** | Master AC Power Switch | Double-Pole Single-Throw (DPST) Rocker Switch with indicator | 1 | Prototype emergency mains isolation |
-| **9** | AC Fuse & Holder | 5A 250V AC Fast-Blow Glass Fuse + 5x20mm Panel-Mount Fuse Holder | 1 | Overcurrent fault protection |
-| **10** | External Pull-Up Resistors | 10kΩ 1/4W 5% Metal Film / Carbon Film Resistors | 2 | Pull-up network for input-only GPIO 34 and 35 |
-| **11** | Flyback Diodes | 1N4007 1000V 1A Silicon Rectifier Diodes | 4 | Coil back-EMF clamping (onboard or external) |
-| **12** | Terminal Blocks | 12-Position Dual-Row 600V 15A Screw Terminal Strip | 2 | Mains AC Live, Neutral, and Earth distribution |
-| **13** | Hookup Wire | 18 AWG Stranded Copper Wire (AC Mains: Brown/Blue/Green-Yellow)<br/>22–24 AWG Solid Copper Wire (DC Logic: Red/Black/Yellow/Blue) | As needed | High-voltage and low-voltage interconnects |
-| **14** | Enclosure Box | ABS Flame-Retardant Electronics Project Box (approx. 250 x 190 x 90 mm) | 1 | Physical safety and isolation containment |
-| **15** | Cable Glands | M16 or PG9 Nylon Cable Glands | 2 | AC mains power cord strain relief |
+| **6** | Wall Toggle Switches | Single-Pole Single-Throw (SPST) Toggle or Rocker Switches (250V / 6A rated) | 2 | Manual appliance override controls |
+| **7** | Master AC Power Switch | Double-Pole Single-Throw (DPST) Rocker Switch with indicator | 1 | Prototype emergency mains isolation |
+| **8** | AC Fuse & Holder | 5A 250V AC Fast-Blow Glass Fuse + 5x20mm Panel-Mount Fuse Holder | 1 | Overcurrent fault protection |
+| **9** | External Pull-Up Resistor | 10kΩ 1/4W 5% Metal Film / Carbon Film Resistor | 1 | Pull-up network for input-only GPIO 35 |
+| **10** | Flyback Diodes | 1N4007 1000V 1A Silicon Rectifier Diodes | 2 | Coil back-EMF clamping (onboard or external) |
+| **11** | Terminal Blocks | 12-Position Dual-Row 600V 15A Screw Terminal Strip | 2 | Mains AC Live, Neutral, and Earth distribution |
+| **12** | Hookup Wire | 18 AWG Stranded Copper Wire (AC Mains: Brown/Blue/Green-Yellow)<br/>22–24 AWG Solid Copper Wire (DC Logic: Red/Black/Yellow/Blue) | As needed | High-voltage and low-voltage interconnects |
+| **13** | Enclosure Box | ABS Flame-Retardant Electronics Project Box (approx. 250 x 190 x 90 mm) | 1 | Physical safety and isolation containment |
+| **14** | Cable Glands | M16 or PG9 Nylon Cable Glands | 2 | AC mains power cord strain relief |
 
 ---
 
@@ -222,7 +228,7 @@ The prototype implements a **dual-rail electrical power architecture** to isolat
 
     220V AC Live ─────[ Master DPST Switch ]─────[ 5A Fuse ]────┬───> To AC-DC 5V Supply
     220V AC Neutral ──[ Master DPST Switch ]────────────────────┼───> To AC-DC 5V Supply
-    220V AC Earth ──────────────────────────────────────────────┼───> To 3-Pin Socket Earth
+    220V AC Earth ──────────────────────────────────────────────┴───> Earth Ground Terminal
                                                                 │
                                               ┌─────────────────┴───────────────┐
                                               │  5V DC / 2A Power Supply        │
@@ -245,7 +251,7 @@ The prototype implements a **dual-rail electrical power architecture** to isolat
      ┌───────────────────────────────────────────────────────────────────────────────┐
      │ +3.3V DC LOGIC RAIL (Orange Bus)                                              │
      │ ├──> Connects to Relay Board VCC (Optocoupler Anodes)                         │
-     │ └──> Connects to 10kΩ External Pull-Up Resistors for GPIO 34 & 35             │
+     │ └──> Connects to 10kΩ External Pull-Up Resistor for GPIO 35                   │
      └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -256,9 +262,9 @@ The prototype implements a **dual-rail electrical power architecture** to isolat
 The GPIO pin assignment table is a **strict hardware-firmware contract** (TRD §6). It is locked across physical wiring, firmware source code, and emulation scripts:
 
 | Logical Channel | Function | ESP32 GPIO | Electrical Mode | Target Appliance / Physical Load |
-| :---: | :---: | :---: | :--- | :--- |
-| **Channel 1** | Relay Actuation Output | **GPIO 22** | Digital Output (Active-HIGH) | 10W Ceiling Light 1 (E27 Lamp Socket) |
-| **Channel 2** | Relay Actuation Output | **GPIO 23** | Digital Output (Active-HIGH) | 10W Ceiling Light 2 (E27 Lamp Socket) |
+| :---: | :---: | :---: | :---: | :--- |
+| **Channel 1** | Relay Actuation Output | **GPIO 22** | Digital Output (Active-LOW) | 10W Ceiling Light 1 (E27 Lamp Socket) |
+| **Channel 2** | Relay Actuation Output | **GPIO 23** | Digital Output (Active-LOW) | 10W Ceiling Light 2 (E27 Lamp Socket) |
 | **Channel 1** | Physical Switch Input | **GPIO 35** | Digital Input (`INPUT` + External 10kΩ Pull-Up) | Ceiling Light 1 Manual Toggle |
 | **Channel 2** | Physical Switch Input | **GPIO 32** | Digital Input (Internal `INPUT_PULLUP`) | Ceiling Light 2 Manual Toggle |
 
@@ -273,9 +279,11 @@ Commercial relay modules use **PC817 optocouplers** to provide galvanic isolatio
    * Connect `JD-VCC` directly to the **+5V DC Power Supply Rail**. This supplies coil actuation current (~70mA per energized relay) without drawing from the ESP32.
    * Connect `VCC` on the logic header to the **ESP32 +3.3V pin**. This powers the optocoupler internal infrared LEDs at 3.3V.
    * Connect `GND` to the **Common Ground Bus**.
-2. **Logic Trigger Polarity**:
-   * Firmware drives output pins using Active-HIGH logic: `digitalWrite(RELAY_PINS[channel], HIGH)` to close contacts.
-   * If using an Active-LOW relay module, invert the logic flag in firmware or install NPN driver transistors (2N2222) with base resistors.
+2. **Logic Trigger Polarity (Active-LOW)**:
+   * The optocoupler internal infrared LED anode is tied to `VCC` (+3.3V).
+   * Firmware drives output pins using **Active-LOW** logic: `digitalWrite(RELAY_PINS[channel], LOW)` sinks current across the optocoupler LED, switching on the phototransistor, energizing the relay coil, and closing the Normally Open (NO) contacts.
+   * Driving `digitalWrite(RELAY_PINS[channel], HIGH)` turns off the optocoupler LED, de-energizing the coil and opening the contacts.
+   * This is governed in firmware via `RELAY_ACTIVE_LOW = true` in `firmware/include/config.h` and helper `relayPinLevel()` in `firmware/src/relays.cpp`.
 3. **Inductive Kickback Protection**:
    * Reverse-biased 1N4007 flyback diodes are installed across each relay coil (`Cathode` to +5V, `Anode` to ground/driver collector) to safely suppress inductive voltage spikes upon de-energization.
 
@@ -285,7 +293,7 @@ Commercial relay modules use **PC817 optocouplers** to provide galvanic isolatio
 
 The ESP32 silicon has specific hardware constraints on higher GPIOs:
 * **GPIO 32**: Bidirectional GPIO equipped with internal software-configurable pull-up and pull-down resistors (~45kΩ). In firmware, it is initialized via `pinMode(32, INPUT_PULLUP)`.
-* **GPIO 35**: **Input-only pin (GPI)** lacking internal pull-up or pull-down resistors in the ESP32 hardware.
+* **GPIO 35**: **Input-only pin (GPI)** lacking internal pull-up or pull-down resistors in the ESP32 hardware silicon.
 * **External Pull-Up Wiring**:
   * Connect a **10kΩ resistor** between `GPIO 35` and the **+3.3V Logic Rail**.
   * Wire the physical toggle switch between `GPIO 35` and the **Common Ground Bus (GND)**.
@@ -303,17 +311,13 @@ The ESP32 silicon has specific hardware constraints on higher GPIOs:
        220V AC Mains Input (Plug)
        ├── Live (L) ────[ Master DPST Switch ]────[ 5A Fuse ]────┬───> AC-DC 5V Supply (L)
        │                                                         │
-       │                                                         ├───> Relay 1 COM ──[NO]──> Bulb 1 (L)
-       │                                                         ├───> Relay 2 COM ──[NO]──> Bulb 2 (L)
-       │                                                         ├───> Relay 3 COM ──[NO]──> Bulb 3 (L)
-       │                                                         └───> Relay 4 COM ──[NO]──> Bulb 4 (L)
+       │                                                         ├───> Relay 1 COM ──[NO]──> Ceiling Light 1 (L)
+       │                                                         └───> Relay 2 COM ──[NO]──> Ceiling Light 2 (L)
        │
        └── Neutral (N) ─[ Master DPST Switch ]───────────────────┬───> AC-DC 5V Supply (N)
                                                                  │
-                                                                 ├───> Bulb 1 Neutral (N)
-                                                                 ├───> Bulb 2 Neutral (N)
-                                                                 ├───> Bulb 3 Neutral (N)
-                                                                 └───> Bulb 4 Neutral (N)
+                                                                 ├───> Ceiling Light 1 Neutral (N)
+                                                                 └───> Ceiling Light 2 Neutral (N)
 ```
 
 * **Relay Terminals Used**: Connect AC Live to the relay **COM (Common)** terminal. Connect the appliance load to the relay **NO (Normally Open)** terminal. When de-energized, the circuit is broken, ensuring zero idle power to the appliance.
@@ -327,30 +331,30 @@ SAOCS employs **Logical 2-Way Switching**:
 ```mermaid
 sequenceDiagram
     participant User as Human Occupant
-    participant Switch as Wall Switch (GPIO 32)
+    participant Switch as Wall Switch 1 (GPIO 35)
     participant ESP as ESP32 Firmware
-    participant Relay as Relay 1 Contact
+    participant Relay as Relay 1 Contact (GPIO 22)
     participant Cloud as Web App / MQTT
 
-    Note over User,Relay: Initial State: Appliance is OFF
+    Note over User,Relay: Initial State: Ceiling Light 1 is OFF
     User->>Switch: Flips Switch (Position A -> B)
     Switch->>ESP: Falling Edge Detected (50ms Debounced)
-    ESP->>Relay: Inverts State (!false = true) -> Relay Closes (ON)
-    ESP->>Cloud: MQTT State Update: {"channel": 0, "state": true, "source": "switch"}
+    ESP->>Relay: Inverts State (!false = true) -> Relay Closes (ON, Active-LOW)
+    ESP->>Cloud: MQTT State Update: {"channel": 1, "state": "ON", "source": "switch"}
     
     Note over Cloud,Relay: Cloud User Intervenes
-    Cloud->>ESP: MQTT Command: {"channel": 0, "action": "OFF"}
-    ESP->>Relay: Actuates Contact -> Relay Opens (OFF)
-    ESP->>Cloud: MQTT State Update: {"channel": 0, "state": false, "source": "web"}
+    Cloud->>ESP: MQTT Command: {"channel": 1, "state": "OFF"}
+    ESP->>Relay: Actuates Contact -> Relay Opens (OFF, Active-LOW)
+    ESP->>Cloud: MQTT State Update: {"channel": 1, "state": "OFF", "source": "command"}
     
     Note over User,Relay: Human Occupant Returns
     User->>Switch: Flips Switch to Other Side (Position B -> A)
     Switch->>ESP: Rising Edge Detected (50ms Debounced)
-    ESP->>Relay: Inverts State (!false = true) -> Relay Closes (ON)!
-    ESP->>Cloud: MQTT State Update: {"channel": 0, "state": true, "source": "switch"}
+    ESP->>Relay: Inverts State (!false = true) -> Relay Closes (ON, Active-LOW)!
+    ESP->>Cloud: MQTT State Update: {"channel": 1, "state": "ON", "source": "switch"}
 ```
 
-#### Firmware Implementation ([firmware/src/main.cpp](file:///firmware/src/main.cpp))
+#### Firmware Implementation ([firmware/src/main.cpp](firmware/src/main.cpp))
 ```cpp
 Switches::tick([](uint8_t channel, bool) {
     Relays::setCurrentSource("switch");
@@ -396,11 +400,34 @@ Execute these verification checks before connecting 220V AC mains power:
 
 ---
 
+## ⏰ Automated Scheduling Engine
+
+SAOCS incorporates an in-process, asynchronous scheduling engine running directly inside the FastAPI lifespan context (`backend/app/services/scheduler.py`).
+
+### Engine Architecture & Execution Flow
+1. **Lifespan Startup**: Initiated during FastAPI application bootstrap (`await scheduler_service.start()`).
+2. **Periodic Evaluation Loop**: Asynchronously queries SQLite at a 30-second polling cadence for pending, unexecuted schedules where `scheduled_time <= now_utc` and `executed_at IS NULL`.
+3. **MQTT Command Dispatch**: Dispatches the required action (`ON` or `OFF`) to the authoritative edge broker topic (`office/<device_id>/command`) with QoS 1 via `aiomqtt`.
+4. **Database Execution Update**: Sets `executed_at = now_utc` inside the database transaction, preventing duplicate triggers.
+5. **Real-Time WebSocket Push**: Broadcasts a `schedule_executed` event across active dashboard WebSocket connections:
+   ```json
+   {
+     "event": "schedule_executed",
+     "schedule_id": 1,
+     "appliance_id": 1,
+     "action": "ON",
+     "timestamp": "2026-10-13T16:00:00Z"
+   }
+   ```
+6. **Frontend Cache Invalidation**: The client dashboard listens for `schedule_executed`, automatically invalidating TanStack Query cache tags `["schedules"]` and updating timeline statuses without requiring a page reload.
+
+---
+
 ## ⚡ Firmware Architecture & Flashing Guide
 
 The firmware is compiled via **PlatformIO Core** using the Arduino framework for ESP32.
 
-### PlatformIO Environments ([firmware/platformio.ini](file:///firmware/platformio.ini))
+### PlatformIO Environments ([firmware/platformio.ini](firmware/platformio.ini))
 * `esp32dev`: Local serial-only bench testing (no Wi-Fi/MQTT dependencies, serial harness enabled).
 * `esp32dev_mqtt`: Full prototype build with Wi-Fi, MQTTS client, NVS persistence, and serial harness.
 * `esp32dev_release`: Production firmware (serial debugging disabled for maximum execution speed).
@@ -429,8 +456,14 @@ pio run -e esp32dev_release
 ### Over-The-Air (OTA) Updates
 Once deployed inside the sealed prototype enclosure, firmware can be updated wirelessly over Wi-Fi without opening the box:
 
+```powershell
+# Windows PowerShell
+pio run -e esp32dev_release -t upload --upload-port <ESP32_HOTSPOT_IP> --upload-flags="--auth=$env:OTA_PASSWORD"
+```
+
 ```bash
-pio run -e esp32dev_release -t upload --upload-port <ESP32_HOTSPOT_IP> --upload-flags "--auth=${OTA_PASSWORD}"
+# Linux Bash
+pio run -e esp32dev_release -t upload --upload-port <ESP32_HOTSPOT_IP> --upload-flags="--auth=${OTA_PASSWORD}"
 ```
 
 ---
@@ -463,12 +496,12 @@ erDiagram
         string name
         string device_id
         int relay_channel UK
-        int assumed_wattage_watts
+        float assumed_wattage_watts
     }
 
     appliance_state {
         int appliance_id PK, FK
-        boolean current_state
+        string current_state
         string last_changed_source
         datetime last_changed_at
     }
@@ -493,9 +526,11 @@ erDiagram
     }
 ```
 
-### Alembic Migrations
+### Alembic Migrations ([backend/alembic/versions/](backend/alembic/versions/))
 * `001_initial_schema`: Establishes the 5 relational tables, unique constraints, foreign keys, and indexes.
 * `002_seed_admin_user`: Seeds the initial administrator account (`israelanuoluwaposimi955@gmail.com`).
+* `003_seed_default_appliances`: Populates initial default appliances and baseline states.
+* `004_downscale_to_two_appliances`: Downscales physical scope strictly to 2 channels (Ceiling Light 1 on Channel 1 and Ceiling Light 2 on Channel 2, 10.0W each), removing legacy expansion channels and associated records.
 
 ---
 
@@ -516,15 +551,20 @@ cp .env.template .env
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 Client Secret | `your-google-secret` |
 | `WIFI_SSID` | 2.4 GHz Wi-Fi / Personal Hotspot SSID | `SAOCS_HOTSPOT` |
 | `WIFI_PASSWORD` | Wi-Fi / Personal Hotspot WPA2 Passphrase | `securepassword` |
+| `OTA_PASSWORD` | ArduinoOTA wireless update authentication password | *(Must be generated)* |
 | `MQTT_BROKER_HOST` | MQTT broker IP or container hostname | `mosquitto` (or OCI static IP) |
+| `MQTT_PORT` | Plaintext MQTT broker port (internal/testing) | `1883` |
 | `MQTT_TLS_PORT` | MQTTS encrypted listener port | `8883` |
+| `MQTT_DEFAULT_DEVICE_ID`| Authoritative edge microcontroller ID | `esp32_prototype_01` |
 | `MQTT_DEVICE_USER` | ESP32 device MQTT username | `saocs_esp32` |
 | `MQTT_DEVICE_PASSWORD` | ESP32 device MQTT password | *(Must be generated)* |
 | `MQTT_BACKEND_USER` | Backend MQTT username | `saocs_backend` |
 | `MQTT_BACKEND_PASSWORD`| Backend MQTT password | *(Must be generated)* |
 | `TARIFF_RATE_PER_KWH` | Kaduna Electric Band A tariff rate in Naira | `209.5` |
 | `DUCKDNS_DOMAIN` | DuckDNS domain for dynamic DNS and ACME TLS | `smart-office-abu.duckdns.org` |
+| `DUCKDNS_SUBDOMAIN` | Subdomain token for DuckDNS IP updater | `smart-office-abu` |
 | `DUCKDNS_TOKEN` | DuckDNS account token | *(Generated at duckdns.org)* |
+| `OCI_STATIC_IP` | Reserved public IP for OCI Ampere A1 instance | `129.159.x.x` |
 
 ---
 
@@ -555,26 +595,29 @@ Access the application at `http://localhost` (or `https://your-domain.duckdns.or
 ### Option B: Local Development Setup (Manual)
 
 #### 1. Backend Service
-```bash
+```powershell
+# Windows PowerShell
 cd backend
-# Install dependencies using uv
 uv sync
-
-# Run database schema migrations
 uv run alembic upgrade head
-
-# Start FastAPI development server
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+```bash
+# Linux Bash
+cd backend && uv sync && uv run alembic upgrade head
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 #### 2. Frontend Application
-```bash
+```powershell
+# Windows PowerShell
 cd frontend
-# Install Node dependencies
-npm install
-
-# Launch Vite development server
-npm run dev
+npm.cmd install
+npm.cmd run dev
+```
+```bash
+# Linux Bash
+cd frontend && npm install && npm run dev
 ```
 Dashboard will be live at `http://localhost:5173`.
 
@@ -585,7 +628,17 @@ If physical ESP32 hardware is not connected, run the Python-based virtual device
 # Launches virtual ESP32 with simulated NVS persistence and 1000ms debounce queue
 python scripts/virtual_esp32.py
 ```
-The emulator connects to Mosquitto and exposes an HTTP simulation API on port `8099` (e.g. `POST http://localhost:8099/api/switches/1/toggle`).
+The emulator connects to Mosquitto and exposes an HTTP simulation API on port `8099`:
+```bash
+# Query current emulator status
+curl http://localhost:8099/status
+
+# Toggle Ceiling Light 1 (Switch 1)
+curl -X POST http://localhost:8099/api/switches/1/toggle
+
+# Toggle Ceiling Light 2 (Switch 2)
+curl -X POST http://localhost:8099/api/switches/2/toggle
+```
 
 ---
 
@@ -593,20 +646,49 @@ The emulator connects to Mosquitto and exposes an HTTP simulation API on port `8
 
 The codebase enforces strict test coverage and static analysis across all layers:
 
-```bash
-# 1. Backend Pytest Suite (50 tests covering auth, endpoints, concurrency, and NVS)
-cd backend && uv run pytest -v
+```powershell
+# Windows PowerShell Execution Suite
 
-# 2. Frontend Vitest Suite (67 tests covering components, WebSocket sync, and energy)
-cd frontend && npm test
+# 1. Backend Pytest Suite (51 tests covering auth, endpoints, concurrency, NVS, scheduler)
+cd backend; uv run pytest -v; cd ..
+
+# 2. Frontend Vitest Suite (69 tests covering components, WebSocket sync, energy calculations)
+cd frontend; npm.cmd test; cd ..
 
 # 3. PlatformIO Firmware Multi-Target Compilation (esp32dev, esp32dev_mqtt, esp32dev_release)
 pio run -d firmware
 
-# 4. Strict Zero-Comments Rule AST Audit
+# 4. Code Quality & Static Analysis Linters
+cd backend; uv run ruff check .; cd ..
+cd frontend; npm.cmd run lint; cd ..
+
+# 5. Strict Zero-Comments Rule AST Audit
 python scripts/audit_zero_comments.py
 
-# 5. Full End-to-End Orchestrator Suite
+# 6. Full End-to-End Orchestrator Suite
+python scripts/run_e2e_tests.py
+```
+
+```bash
+# Linux Bash Execution Suite
+
+# 1. Backend Pytest Suite (51 tests)
+cd backend && uv run pytest -v && cd ..
+
+# 2. Frontend Vitest Suite (69 tests)
+cd frontend && npm test && cd ..
+
+# 3. PlatformIO Firmware Compilation
+pio run -d firmware
+
+# 4. Linters
+cd backend && uv run ruff check . && cd ..
+cd frontend && npm run lint && cd ..
+
+# 5. Strict Zero-Comments Rule AST Audit
+python scripts/audit_zero_comments.py
+
+# 6. Full End-to-End Orchestrator Suite
 python scripts/run_e2e_tests.py
 ```
 
@@ -614,14 +696,14 @@ python scripts/run_e2e_tests.py
 
 ## 🚢 CI/CD & Deployment Guide
 
-SAOCS utilizes a **GitHub Actions CI/CD pipeline** (`.github/workflows/deploy.yml`) with automated testing gates and secure OCI deployment:
+SAOCS utilizes a **GitHub Actions CI/CD pipeline** (`.github/workflows/ci.yml`) with automated testing gates and secure OCI deployment:
 
 ```mermaid
 graph LR
     Push[Git Push to main] --> Lint[Lint & Code Audit]
-    Push --> TestFirmware[PlatformIO Build]
-    Push --> TestBackend[Pytest 50/50]
-    Push --> TestFrontend[Vitest 67/67]
+    Push --> TestFirmware[PlatformIO Build: 3 Targets]
+    Push --> TestBackend[Pytest 51/51]
+    Push --> TestFrontend[Vitest 69/69]
     
     Lint --> Gate{All Checks Passed?}
     TestFirmware --> Gate
@@ -634,9 +716,10 @@ graph LR
     Deploy --> Health[Automated Container Healthcheck]
 ```
 
-### Production Host Requirements
+### Production Host Architecture
 * **Oracle Cloud Infrastructure (OCI)**: Ampere A1 Compute Instance (Always-Free 4 OCPU, 24 GB RAM).
-* **Ports Opened**: `80/tcp` (HTTP ACME redirect), `443/tcp` (HTTPS Caddy), `8883/tcp` (MQTTS TLS).
+* **Ports Opened**: `80/tcp` (HTTP ACME redirect), `443/tcp` (HTTPS Caddy), `443/udp` (HTTP/3 QUIC), `1883/tcp` (Internal MQTT), `8883/tcp` (MQTTS TLS).
+* **Automated TLS Certificate Sharing**: Caddy provisions Let's Encrypt certificates using the DuckDNS DNS-01 ACME challenge plugin into the shared Docker volume `caddy_data`. Mosquitto mounts `caddy_data:/caddy-data:ro`, reading certificate and key files directly without requiring duplicate certbot renewal jobs.
 
 ---
 

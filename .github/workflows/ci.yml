@@ -85,6 +85,7 @@ jobs:
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
@@ -116,7 +117,7 @@ jobs:
           host: ${{ secrets.OCI_VM_HOST }}
           username: ${{ secrets.OCI_DEPLOY_USER }}
           key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
-          command_timeout: 30m
+          command_timeout: 60m
           envs: DUCKDNS_DOMAIN,DUCKDNS_SUBDOMAIN,DUCKDNS_TOKEN,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI,FRONTEND_URL,VITE_API_BASE_URL,ALLOWED_ORIGINS,MQTT_BACKEND_PASSWORD,MQTT_DEVICE_PASSWORD,OTA_PASSWORD,WIFI_SSID,WIFI_PASSWORD,OCI_STATIC_IP,GIT_SHA
           script: |
             if ! swapon --show | grep -q '/swapfile'; then

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Zap, CircleDollarSign } from "lucide-react"
+import { Zap } from "lucide-react"
+import { CircleNairaSign } from "@/components/circle-naira-sign"
 import { listAppliances } from "@/api/appliances"
 import { listActivityLogs } from "@/api/activity-log"
 import { ApplianceTile } from "@/components/appliance-tile"
@@ -78,7 +79,7 @@ export function DashboardPage() {
 
           <div className="border-l border-(--color-border) pl-6 flex items-center gap-3">
             <div className="w-10 h-10 rounded-(--radius-md) bg-(--color-surface-2) border border-(--color-border) flex items-center justify-center">
-              <CircleDollarSign className="w-5 h-5 text-emerald-400" aria-hidden="true" />
+              <CircleNairaSign className="w-5 h-5 text-emerald-400" aria-hidden="true" />
             </div>
             <div>
               <div className="text-[11px] font-medium text-(--color-foreground-2) uppercase tracking-wider">

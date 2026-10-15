@@ -23,7 +23,9 @@ async def websocket_endpoint(
     await websocket_manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            if data == "ping" or '"ping"' in data:
+                await websocket.send_text('{"event":"pong"}')
     except WebSocketDisconnect:
         pass
     except Exception:

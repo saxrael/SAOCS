@@ -12,18 +12,22 @@ export function useWebSocket() {
   const socketRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<number | null>(null)
   const backoffRef = useRef<number>(1000)
+  const pingIntervalRef = useRef<number | null>(null)
 
   useEffect(() => {
     let isMounted = true
 
     async function connect() {
-      const token = await apiClient.getAccessToken()
+      let token = await apiClient.getAccessToken()
       if (!token) {
-        setStatus("DISCONNECTED")
+        token = await apiClient.refreshAccessToken()
+      }
+      if (!token) {
+        if (isMounted) setStatus("DISCONNECTED")
         return
       }
 
-      setStatus("CONNECTING")
+      if (isMounted) setStatus("CONNECTING")
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
       const wsUrl = `${protocol}//${window.location.host}/api/ws?token=${encodeURIComponent(token)}`
 
@@ -37,6 +41,19 @@ export function useWebSocket() {
         queryClient.invalidateQueries({ queryKey: ["appliances"] })
         queryClient.invalidateQueries({ queryKey: ["activity-log"] })
         queryClient.invalidateQueries({ queryKey: ["schedules"] })
+
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current)
+        }
+        pingIntervalRef.current = window.setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(JSON.stringify({ type: "ping" }))
+            } catch {
+              void 0
+            }
+          }
+        }, 20000)
       }
 
       ws.onmessage = (event) => {
@@ -73,19 +90,54 @@ export function useWebSocket() {
         ws.close()
       }
 
-      ws.onclose = () => {
+      ws.onclose = async (event) => {
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current)
+          pingIntervalRef.current = null
+        }
         if (!isMounted) return
         setStatus("DISCONNECTED")
-        const delay = Math.min(backoffRef.current, 30000)
+
+        if (event.code === 1008) {
+          const refreshed = await apiClient.refreshAccessToken()
+          if (!refreshed) {
+            return
+          }
+        }
+
+        const delay = Math.min(backoffRef.current, 15000)
         backoffRef.current *= 2
         reconnectTimeoutRef.current = window.setTimeout(connect, delay)
       }
     }
 
+    function handleVisibilityOrOnline() {
+      if (document.visibilityState === "visible" || navigator.onLine) {
+        if (socketRef.current?.readyState !== WebSocket.OPEN) {
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current)
+            reconnectTimeoutRef.current = null
+          }
+          backoffRef.current = 1000
+          connect()
+        }
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityOrOnline)
+    window.addEventListener("online", handleVisibilityOrOnline)
+    window.addEventListener("focus", handleVisibilityOrOnline)
+
     connect()
 
     return () => {
       isMounted = false
+      document.removeEventListener("visibilitychange", handleVisibilityOrOnline)
+      window.removeEventListener("online", handleVisibilityOrOnline)
+      window.removeEventListener("focus", handleVisibilityOrOnline)
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current)
+      }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }

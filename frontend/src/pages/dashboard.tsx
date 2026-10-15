@@ -16,6 +16,7 @@ export function DashboardPage() {
   const { data: appliances, isLoading: isAppliancesLoading, error: appliancesError } = useQuery({
     queryKey: ["appliances"],
     queryFn: listAppliances,
+    refetchInterval: 5000,
   })
 
   const { data: logs, isLoading: isLogsLoading } = useQuery({

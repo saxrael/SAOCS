@@ -28,20 +28,27 @@ async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem("refresh_token")
   if (!refreshToken) return null
 
-  const response = await fetch(`${API_BASE}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  })
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    const response = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId))
 
-  if (!response.ok) {
-    clearTokens()
+    if (!response.ok) {
+      clearTokens()
+      return null
+    }
+
+    const data = await response.json()
+    setTokens(data.access_token, data.refresh_token)
+    return data.access_token
+  } catch {
     return null
   }
-
-  const data = await response.json()
-  setTokens(data.access_token, data.refresh_token)
-  return data.access_token
 }
 
 async function request<T>(
@@ -58,19 +65,47 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`
   }
 
-  let response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal,
+    })
+  } catch (err: unknown) {
+    clearTimeout(timeoutId)
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new ApiError(408, "Request timed out")
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (response.status === 401 && token) {
     const newToken = await refreshAccessToken()
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`
-      response = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        headers,
-      })
+      const retryController = new AbortController()
+      const retryTimeoutId = setTimeout(() => retryController.abort(), 10000)
+      try {
+        response = await fetch(`${API_BASE}${path}`, {
+          ...options,
+          headers,
+          signal: options.signal || retryController.signal,
+        })
+      } catch (err: unknown) {
+        clearTimeout(retryTimeoutId)
+        if (err instanceof Error && err.name === "AbortError") {
+          throw new ApiError(408, "Request timed out")
+        }
+        throw err
+      } finally {
+        clearTimeout(retryTimeoutId)
+      }
     }
   }
 
@@ -101,6 +136,7 @@ export const apiClient = {
     }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   getAccessToken,
+  refreshAccessToken,
   setTokens,
   clearTokens,
   ApiError,

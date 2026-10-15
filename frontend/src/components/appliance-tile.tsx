@@ -15,14 +15,52 @@ export function ApplianceTile({ appliance }: { appliance: Appliance }) {
   const mutation = useMutation({
     mutationFn: (targetState: "ON" | "OFF") =>
       commandAppliance(appliance.id, { state: targetState }),
-    onSuccess: () => {
+    onMutate: async (targetState: "ON" | "OFF") => {
       setError(null)
-      queryClient.invalidateQueries({ queryKey: ["appliances"] })
-      queryClient.invalidateQueries({ queryKey: ["activity-log"] })
+      await queryClient.cancelQueries({ queryKey: ["appliances"] })
+      const previousAppliances = queryClient.getQueryData<Appliance[]>(["appliances"])
+      queryClient.setQueryData<Appliance[]>(["appliances"], (old) => {
+        if (!old) return old
+        return old.map((a) =>
+          a.id === appliance.id
+            ? {
+                ...a,
+                state: {
+                  current_state: targetState,
+                  last_changed_source: "command",
+                  last_changed_at: new Date().toISOString(),
+                },
+              }
+            : a,
+        )
+      })
+      return { previousAppliances }
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, _variables, context) => {
+      if (context?.previousAppliances) {
+        queryClient.setQueryData(["appliances"], context.previousAppliances)
+      }
       const msg = err instanceof Error ? err.message : "Command failed"
       setError(`Failed to turn ${isOn ? "off" : "on"} ${appliance.name}: ${msg}`)
+    },
+    onSuccess: (data) => {
+      setError(null)
+      queryClient.setQueryData<Appliance[]>(["appliances"], (old) => {
+        if (!old) return old
+        return old.map((a) =>
+          a.id === appliance.id
+            ? {
+                ...a,
+                state: {
+                  current_state: data.target_state as "ON" | "OFF",
+                  last_changed_source: "command",
+                  last_changed_at: new Date().toISOString(),
+                },
+              }
+            : a,
+        )
+      })
+      queryClient.invalidateQueries({ queryKey: ["activity-log"] })
     },
   })
 

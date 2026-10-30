@@ -737,12 +737,3 @@ graph LR
 > 7. **Broker Isolation**: The ESP32 is restricted via Mosquitto ACLs to its own device topics (`office/esp32_prototype_01/#`) and cannot publish to administrative or other device queues.
 
 ---
-
-## 🎓 Academic Defense Attribution
-
-* **Project Title**: Design and Implementation of a Smart Office Appliance Control System (SAOCS)
-* **Candidate & Presenter**: Jesutoyin Adeshina (Matriculation Number: **U21CS1119**)
-* **Institution**: Department of Computer Science, Faculty of Physical Sciences, Ahmadu Bello University, Zaria, Nigeria
-* **Software & Firmware Lead**: Israel
-* **Hardware & Fabrication Lead**: Abdulfatai
-* **Tariff Baseline**: Kaduna Electric (KAEDC) Band A Cost Matrix (₦209.5 per kWh, July 2024 NERC Schedule)
